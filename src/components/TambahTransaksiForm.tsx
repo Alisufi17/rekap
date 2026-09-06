@@ -18,7 +18,6 @@ interface Draft {
   total: string;
   hpp: string;
   ongkir: string;
-  admin: string;
   catatan: string;
   lunas: string;
   historis: boolean;
@@ -59,7 +58,6 @@ export default function TambahTransaksiForm({ products }: { products: Product[] 
   const [total, setTotal] = useState("");
   const [hpp, setHpp] = useState(String(products[0]?.hpp ?? 0));
   const [ongkir, setOngkir] = useState("");
-  const [adminBiaya, setAdminBiaya] = useState("");
   const [catatan, setCatatan] = useState("");
   const [lunas, setLunas] = useState("lunas");
   const [historis, setHistoris] = useState(false);
@@ -77,7 +75,6 @@ export default function TambahTransaksiForm({ products }: { products: Product[] 
     if (d.total) setTotal(d.total);
     if (d.hpp) setHpp(d.hpp);
     if (d.ongkir) setOngkir(d.ongkir);
-    if (d.admin) setAdminBiaya(d.admin);
     if (d.catatan) setCatatan(d.catatan);
     if (d.lunas) setLunas(d.lunas);
     if (d.historis) setHistoris(d.historis);
@@ -97,12 +94,11 @@ export default function TambahTransaksiForm({ products }: { products: Product[] 
       total,
       hpp,
       ongkir,
-      admin: adminBiaya,
       catatan,
       lunas,
       historis,
     });
-  }, [ready, channel, tanggal, customer, phone, produkId, qty, total, hpp, ongkir, adminBiaya, catatan, lunas, historis]);
+  }, [ready, channel, tanggal, customer, phone, produkId, qty, total, hpp, ongkir, catatan, lunas, historis]);
 
   if (products.length === 0) {
     return (
@@ -119,10 +115,9 @@ export default function TambahTransaksiForm({ products }: { products: Product[] 
   const totalNum = parseFloat(total) || 0;
   const hppNum = parseFloat(hpp) || 0;
   const ongkirNum = parseFloat(ongkir) || 0;
-  const adminNum = parseFloat(adminBiaya) || 0;
   const perPcs = qtyNum > 0 ? totalNum / qtyNum : 0;
   const modal = qtyNum * hppNum;
-  const profit = channel === "online" ? totalNum - modal - ongkirNum - adminNum : totalNum - modal;
+  const profit = channel === "online" ? totalNum - modal - ongkirNum : totalNum - modal;
 
   function onProductPick(id: string) {
     setProdukId(id);
@@ -150,7 +145,7 @@ export default function TambahTransaksiForm({ products }: { products: Product[] 
       totalHarga: totalNum,
       hpp: hppNum,
       ongkir: ongkirNum,
-      admin: adminNum,
+      admin: 0,
       catatan,
       status: channel === "offline" ? lunas : "proses",
       affectsStock: !historis,
@@ -287,28 +282,16 @@ export default function TambahTransaksiForm({ products }: { products: Product[] 
       </Field>
 
       {channel === "online" ? (
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Ongkir">
-            <input
-              type="number"
-              min={0}
-              value={ongkir}
-              onChange={(e) => setOngkir(e.target.value)}
-              placeholder="0"
-              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
-            />
-          </Field>
-          <Field label="Biaya Admin/Ads">
-            <input
-              type="number"
-              min={0}
-              value={adminBiaya}
-              onChange={(e) => setAdminBiaya(e.target.value)}
-              placeholder="0"
-              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
-            />
-          </Field>
-        </div>
+        <Field label="Ongkir">
+          <input
+            type="number"
+            min={0}
+            value={ongkir}
+            onChange={(e) => setOngkir(e.target.value)}
+            placeholder="0"
+            className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+          />
+        </Field>
       ) : (
         <Field label="Status Pembayaran">
           <select
@@ -335,9 +318,7 @@ export default function TambahTransaksiForm({ products }: { products: Product[] 
       <div className="rounded-lg border border-border bg-white p-3 text-sm">
         <Row label="Omset (total deal)" value={fmtIDR(totalNum)} />
         <Row label="Modal (HPP × qty)" value={`-${fmtIDR(modal)}`} />
-        {channel === "online" && (
-          <Row label="Ongkir + Admin" value={`-${fmtIDR(ongkirNum + adminNum)}`} />
-        )}
+        {channel === "online" && <Row label="Ongkir" value={`-${fmtIDR(ongkirNum)}`} />}
         <Row label="Estimasi Profit" value={fmtIDR(profit)} bold />
       </div>
 
