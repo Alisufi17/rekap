@@ -2,6 +2,14 @@
 // migrasi terbaru dan sesuaikan di sini — atau generate ulang dengan:
 //   npx supabase gen types typescript --project-id ayxmrlecjqmhsoirrost > src/types/database.ts
 // (perlu Supabase CLI + login; sampai itu dipasang, tipe di bawah adalah sumbernya)
+//
+// PENTING: semua bentuk row di bawah pakai `type X = {...}`, BUKAN
+// `interface X {...}`. Interface tidak punya index signature tersirat,
+// sehingga gagal dicocokkan ke `Record<string, unknown>` yang dipakai
+// @supabase/postgrest-js secara internal untuk menurunkan tipe
+// .insert()/.update()/.upsert() — akibatnya semua tipe itu diam-diam jatuh
+// ke `never` tanpa pesan error yang jelas. `type` alias (object literal)
+// tidak kena masalah ini.
 
 export type UserRole = "admin" | "staff";
 export type TxChannel = "online" | "offline";
@@ -9,22 +17,22 @@ export type TxStatusOnline = "proses" | "selesai" | "rts";
 export type TxStatusOffline = "lunas" | "belum";
 export type TxStatus = TxStatusOnline | TxStatusOffline;
 
-export interface Profile {
+export type Profile = {
   id: string;
   email: string | null;
   nama: string | null;
   role: UserRole;
   created_at: string;
-}
+};
 
-export interface Product {
+export type Product = {
   id: string;
   nama: string;
   hpp: number;
   stok: number;
-}
+};
 
-export interface Transaction {
+export type Transaction = {
   id: string;
   channel: TxChannel;
   tanggal: string; // date, format YYYY-MM-DD
@@ -43,13 +51,13 @@ export interface Transaction {
   created_by_uid: string | null;
   affects_stock: boolean;
   created_at: string;
-}
+};
 
-export interface DailyMetric {
+export type DailyMetric = {
   tanggal: string;
   spend_iklan: number;
   chat_masuk: number;
-}
+};
 
 export type ExpenseCategoryCode =
   | "packing"
@@ -61,14 +69,14 @@ export type ExpenseCategoryCode =
   | "platform"
   | "lainnya";
 
-export interface ExpenseCategory {
+export type ExpenseCategory = {
   kode: ExpenseCategoryCode;
   nama: string;
   urutan: number;
   aktif: boolean;
-}
+};
 
-export interface OperatingExpense {
+export type OperatingExpense = {
   id: string;
   tanggal: string;
   kategori: ExpenseCategoryCode;
@@ -77,19 +85,19 @@ export interface OperatingExpense {
   berulang: boolean;
   created_by_uid: string | null;
   created_at: string;
-}
+};
 
-export interface MonthlyTarget {
+export type MonthlyTarget = {
   bulan: string; // selalu tanggal 1, misal "2026-09-01"
   target_omset: number;
   target_profit: number;
   catatan: string | null;
   updated_at: string;
-}
+};
 
 // ---- Views (lihat 0004_financial_views.sql) ----
 
-export interface VTransaction extends Transaction {
+export type VTransaction = Transaction & {
   omset: number;
   modal: number;
   biaya_transaksi: number;
@@ -98,9 +106,9 @@ export interface VTransaction extends Transaction {
   estimasi: boolean;
   piutang: boolean;
   retur: boolean;
-}
+};
 
-export interface VDailySales {
+export type VDailySales = {
   tanggal: string;
   jumlah_transaksi: number;
   omset: number;
@@ -112,9 +120,9 @@ export interface VDailySales {
   piutang: number;
   nilai_retur: number;
   jumlah_retur: number;
-}
+};
 
-export interface VMonthlyPnl {
+export type VMonthlyPnl = {
   bulan: string;
   omset: number;
   omset_online: number;
@@ -131,43 +139,62 @@ export interface VMonthlyPnl {
   target_profit: number | null;
   capaian_omset_persen: number | null;
   capaian_profit_persen: number | null;
-}
+};
 
-export interface Database {
+// `Relationships` dan `Functions` di bawah wajib ada persis dengan nama field
+// ini — itu bagian dari GenericTable/GenericSchema yang dipakai internal oleh
+// @supabase/postgrest-js untuk menurunkan tipe .insert()/.update()/.rpc().
+type NoRelationships = { Relationships: never[] };
+
+export type Database = {
   public: {
     Tables: {
-      profiles: { Row: Profile; Insert: Partial<Profile>; Update: Partial<Profile> };
-      products: { Row: Product; Insert: Partial<Product>; Update: Partial<Product> };
+      profiles: {
+        Row: Profile;
+        Insert: Partial<Profile>;
+        Update: Partial<Profile>;
+      } & NoRelationships;
+      products: {
+        Row: Product;
+        Insert: Partial<Product>;
+        Update: Partial<Product>;
+      } & NoRelationships;
       transactions: {
         Row: Transaction;
         Insert: Partial<Transaction>;
         Update: Partial<Transaction>;
-      };
+      } & NoRelationships;
       daily_metrics: {
         Row: DailyMetric;
         Insert: Partial<DailyMetric>;
         Update: Partial<DailyMetric>;
-      };
+      } & NoRelationships;
       expense_categories: {
         Row: ExpenseCategory;
         Insert: Partial<ExpenseCategory>;
         Update: Partial<ExpenseCategory>;
-      };
+      } & NoRelationships;
       operating_expenses: {
         Row: OperatingExpense;
         Insert: Partial<OperatingExpense>;
         Update: Partial<OperatingExpense>;
-      };
+      } & NoRelationships;
       monthly_targets: {
         Row: MonthlyTarget;
         Insert: Partial<MonthlyTarget>;
         Update: Partial<MonthlyTarget>;
-      };
+      } & NoRelationships;
     };
     Views: {
-      v_transactions: { Row: VTransaction };
-      v_daily_sales: { Row: VDailySales };
-      v_monthly_pnl: { Row: VMonthlyPnl };
+      v_transactions: { Row: VTransaction } & NoRelationships;
+      v_daily_sales: { Row: VDailySales } & NoRelationships;
+      v_monthly_pnl: { Row: VMonthlyPnl } & NoRelationships;
+    };
+    Functions: {
+      salin_biaya_berulang: {
+        Args: { p_bulan: string };
+        Returns: number;
+      };
     };
   };
-}
+};

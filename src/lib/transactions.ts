@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile, isAdmin } from "@/lib/auth";
+import type { TxStatus } from "@/types/database";
 
 export interface ActionResult {
   ok: boolean;
@@ -77,7 +78,10 @@ export async function updateTransactionStatus(id: string, status: string): Promi
     return { ok: false, error: "Hanya bisa mengubah transaksi milik sendiri" };
   }
 
-  const { error } = await supabase.from("transactions").update({ status }).eq("id", id);
+  const { error } = await supabase
+    .from("transactions")
+    .update({ status: status as TxStatus })
+    .eq("id", id);
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/dashboard");

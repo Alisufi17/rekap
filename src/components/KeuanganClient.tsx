@@ -8,7 +8,13 @@ import {
   copyRecurringExpenses,
 } from "@/lib/finance";
 import { fmtIDR, fmtDate, localDateStr, todayStr } from "@/lib/format";
-import type { ExpenseCategory, OperatingExpense, MonthlyTarget, VMonthlyPnl } from "@/types/database";
+import type {
+  ExpenseCategory,
+  ExpenseCategoryCode,
+  OperatingExpense,
+  MonthlyTarget,
+  VMonthlyPnl,
+} from "@/types/database";
 
 function firstOfMonth(d = new Date()) {
   const x = new Date(d.getFullYear(), d.getMonth(), 1);
@@ -149,7 +155,7 @@ function BiayaOperasional({
   expenses: OperatingExpense[];
 }) {
   const [tanggal, setTanggal] = useState(todayStr());
-  const [kategori, setKategori] = useState(categories[0]?.kode ?? "lainnya");
+  const [kategori, setKategori] = useState<ExpenseCategoryCode>(categories[0]?.kode ?? "lainnya");
   const [nominal, setNominal] = useState("");
   const [catatan, setCatatan] = useState("");
   const [berulang, setBerulang] = useState(false);
@@ -216,7 +222,7 @@ function BiayaOperasional({
             <label className="mb-1 block text-xs font-medium text-ink-soft">Kategori</label>
             <select
               value={kategori}
-              onChange={(e) => setKategori(e.target.value)}
+              onChange={(e) => setKategori(e.target.value as ExpenseCategoryCode)}
               className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
             >
               {categories.map((c) => (

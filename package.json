@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.5.2",
+    "@supabase/ssr": "^0.12.6",
     "@supabase/supabase-js": "^2.45.4",
     "chart.js": "^4.4.4",
     "next": "^14.2.15",
