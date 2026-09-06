@@ -2,16 +2,24 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { computeDashboard, type Period } from "@/lib/dashboard";
-import { fmtIDR, fmtDate } from "@/lib/format";
+import {
+  computeDashboard,
+  rangeForPreset,
+  rangeLabel,
+  type PresetKey,
+  type DateRange,
+} from "@/lib/dashboard";
+import { fmtIDR, fmtDate, todayStr } from "@/lib/format";
 import TrendChart from "@/components/TrendChart";
 import type { VTransaction, DailyMetric, VMonthlyPnl, Product } from "@/types/database";
 
-const PERIOD_LABEL: Record<Period, string> = {
-  daily: "Hari ini",
-  weekly: "7 hari terakhir",
-  monthly: "30 hari terakhir",
-};
+const PRESETS: [PresetKey, string][] = [
+  ["hari_ini", "Hari ini"],
+  ["7_hari", "7 hari"],
+  ["30_hari", "30 hari"],
+  ["bulan_ini", "Bulan ini"],
+  ["bulan_lalu", "Bulan lalu"],
+];
 
 export default function DashboardClient({
   transactions,
@@ -19,15 +27,42 @@ export default function DashboardClient({
   monthlyPnl,
   isAdmin,
   lowStockProducts,
+  initialFrom,
+  initialTo,
 }: {
   transactions: VTransaction[];
   dailyMetrics: DailyMetric[];
   monthlyPnl: VMonthlyPnl | null;
   isAdmin: boolean;
   lowStockProducts: Product[];
+  initialFrom?: string;
+  initialTo?: string;
 }) {
-  const [period, setPeriod] = useState<Period>("weekly");
-  const d = computeDashboard(transactions, dailyMetrics, period);
+  const hasInitialRange = Boolean(initialFrom);
+  const [preset, setPreset] = useState<PresetKey>(hasInitialRange ? "custom" : "7_hari");
+  const [customRange, setCustomRange] = useState<DateRange>(
+    hasInitialRange
+      ? { from: initialFrom!, to: initialTo || initialFrom! }
+      : { from: todayStr(), to: todayStr() }
+  );
+  const [showCustomPicker, setShowCustomPicker] = useState(hasInitialRange);
+  const [draftFrom, setDraftFrom] = useState(customRange.from);
+  const [draftTo, setDraftTo] = useState(customRange.to);
+
+  const range = preset === "custom" ? customRange : rangeForPreset(preset);
+  const d = computeDashboard(transactions, dailyMetrics, range);
+
+  function applyPreset(p: PresetKey) {
+    setPreset(p);
+    setShowCustomPicker(false);
+  }
+
+  function applyCustomRange() {
+    const from = draftFrom > draftTo ? draftTo : draftFrom;
+    const to = draftFrom > draftTo ? draftFrom : draftTo;
+    setCustomRange({ from, to });
+    setPreset("custom");
+  }
 
   return (
     <div className="space-y-4">
@@ -68,22 +103,61 @@ export default function DashboardClient({
         </div>
       ) : null}
 
-      <div className="flex gap-1 rounded-lg bg-white p-1 text-sm">
-        {(["daily", "weekly", "monthly"] as Period[]).map((p) => (
+      <div className="flex flex-wrap gap-1.5 rounded-lg bg-white p-1.5 text-xs">
+        {PRESETS.map(([key, label]) => (
           <button
-            key={p}
-            onClick={() => setPeriod(p)}
-            className={`flex-1 rounded-md py-2 font-medium ${
-              period === p ? "bg-primary text-white" : "text-ink-soft"
+            key={key}
+            onClick={() => applyPreset(key)}
+            className={`rounded-md px-2.5 py-1.5 font-medium ${
+              preset === key ? "bg-primary text-white" : "text-ink-soft"
             }`}
           >
-            {p === "daily" ? "Harian" : p === "weekly" ? "Mingguan" : "Bulanan"}
+            {label}
           </button>
         ))}
+        <button
+          onClick={() => setShowCustomPicker((v) => !v)}
+          className={`rounded-md px-2.5 py-1.5 font-medium ${
+            preset === "custom" ? "bg-primary text-white" : "text-ink-soft"
+          }`}
+        >
+          Pilih tanggal
+        </button>
       </div>
 
+      {showCustomPicker && (
+        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-border bg-white p-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-soft">Dari</label>
+            <input
+              type="date"
+              value={draftFrom}
+              max={todayStr()}
+              onChange={(e) => setDraftFrom(e.target.value)}
+              className="rounded-lg border border-border px-2.5 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-soft">Sampai</label>
+            <input
+              type="date"
+              value={draftTo}
+              max={todayStr()}
+              onChange={(e) => setDraftTo(e.target.value)}
+              className="rounded-lg border border-border px-2.5 py-2 text-sm"
+            />
+          </div>
+          <button
+            onClick={applyCustomRange}
+            className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white"
+          >
+            Terapkan
+          </button>
+        </div>
+      )}
+
       <div className="rounded-xl bg-primary p-4 text-white">
-        <div className="text-xs opacity-80">Omset Terkonfirmasi · {PERIOD_LABEL[period]}</div>
+        <div className="text-xs opacity-80">Omset Terkonfirmasi · {rangeLabel(preset, range)}</div>
         <div className="num mt-1 text-2xl font-extrabold">{fmtIDR(d.omset)}</div>
         <div className="mt-3 flex justify-between text-xs opacity-90">
           <div>
@@ -187,7 +261,7 @@ export default function DashboardClient({
             <StatBox
               label="Spend Iklan"
               value={fmtIDR(d.totalSpend)}
-              helper={PERIOD_LABEL[period].toLowerCase()}
+              helper={rangeLabel(preset, range).toLowerCase()}
               borderColor="border-accent"
             />
             <StatBox

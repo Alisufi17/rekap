@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { fmtIDR, localDateStr } from "@/lib/format";
+import Link from "next/link";
+import { fmtIDR, localDateStr, todayStr } from "@/lib/format";
 import type { VDailySales } from "@/types/database";
 
 const DOW = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
@@ -65,6 +66,10 @@ export default function KalenderClient({ dailySales }: { dailySales: VDailySales
 
   const monthLabel = calDate.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 
+  const monthFrom = localDateStr(new Date(calDate.getFullYear(), calDate.getMonth(), 1));
+  const lastDayOfMonth = localDateStr(new Date(calDate.getFullYear(), calDate.getMonth() + 1, 0));
+  const monthTo = lastDayOfMonth < todayStr() ? lastDayOfMonth : todayStr();
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -83,7 +88,7 @@ export default function KalenderClient({ dailySales }: { dailySales: VDailySales
         </button>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-2.5">
+      <div className="mb-2 grid grid-cols-2 gap-2.5">
         <div className="rounded-xl border-l-4 border-online bg-white p-3">
           <div className="text-xs text-ink-soft">Omset bulan ini</div>
           <div className="num text-lg font-bold">{fmtIDR(monthOmset)}</div>
@@ -93,6 +98,13 @@ export default function KalenderClient({ dailySales }: { dailySales: VDailySales
           <div className="num text-lg font-bold">{fmtIDR(monthProfit)}</div>
         </div>
       </div>
+
+      <Link
+        href={`/dashboard?from=${monthFrom}&to=${monthTo}`}
+        className="mb-4 block rounded-lg border border-border bg-white py-2 text-center text-xs font-medium text-primary"
+      >
+        Lihat detail {monthLabel} di Dashboard →
+      </Link>
 
       <div className="grid grid-cols-7 gap-1">
         {DOW.map((d) => (
@@ -108,10 +120,11 @@ export default function KalenderClient({ dailySales }: { dailySales: VDailySales
           const bg = c.omset > 0 ? `rgba(14,124,90,${intensity.toFixed(2)})` : undefined;
           const textColor = intensity > 0.5 ? "#fff" : undefined;
           return (
-            <div
+            <Link
               key={c.key}
+              href={`/dashboard?from=${c.key}&to=${c.key}`}
               title={`${fmtIDR(c.omset)} · profit ${fmtIDR(c.profit)} · ${c.count} transaksi`}
-              className={`relative aspect-square rounded-lg p-1 text-left ${
+              className={`relative block aspect-square rounded-lg p-1 text-left ${
                 c.omset > 0 ? "" : "bg-surface"
               }`}
               style={bg ? { backgroundColor: bg } : undefined}
@@ -135,7 +148,7 @@ export default function KalenderClient({ dailySales }: { dailySales: VDailySales
                     : (c.omset / 1_000).toFixed(0) + "rb"
                   : "-"}
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>

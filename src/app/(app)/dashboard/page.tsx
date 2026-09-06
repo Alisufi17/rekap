@@ -6,13 +6,21 @@ import type { VTransaction, DailyMetric, VMonthlyPnl, Product } from "@/types/da
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; to?: string }>;
+}) {
+  const { from, to } = await searchParams;
   const { profile } = await getCurrentProfile();
   const admin = isAdmin(profile);
   const supabase = await createClient();
 
+  // 400 hari ke belakang: cukup untuk preset rolling (7/30 hari, bulan
+  // ini/lalu) maupun rentang kustom yang dipilih dari halaman Kalender,
+  // semua dihitung ulang di client tanpa round-trip baru ke server.
   const windowStart = new Date();
-  windowStart.setDate(windowStart.getDate() - 34);
+  windowStart.setDate(windowStart.getDate() - 400);
   const windowStartStr = localDateStr(windowStart);
 
   const monthStart = new Date();
@@ -43,6 +51,8 @@ export default async function DashboardPage() {
       monthlyPnl={monthlyPnl}
       isAdmin={admin}
       lowStockProducts={lowStockProducts}
+      initialFrom={from}
+      initialTo={to}
     />
   );
 }
