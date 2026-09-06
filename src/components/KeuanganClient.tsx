@@ -1,0 +1,291 @@
+"use client";
+
+import { useState } from "react";
+import {
+  upsertMonthlyTarget,
+  addOperatingExpense,
+  deleteOperatingExpense,
+  copyRecurringExpenses,
+} from "@/lib/finance";
+import { fmtIDR, fmtDate, localDateStr, todayStr } from "@/lib/format";
+import type { ExpenseCategory, OperatingExpense, MonthlyTarget, VMonthlyPnl } from "@/types/database";
+
+function firstOfMonth(d = new Date()) {
+  const x = new Date(d.getFullYear(), d.getMonth(), 1);
+  return localDateStr(x);
+}
+
+export default function KeuanganClient({
+  categories,
+  expenses,
+  target,
+  pnl,
+}: {
+  categories: ExpenseCategory[];
+  expenses: OperatingExpense[];
+  target: MonthlyTarget | null;
+  pnl: VMonthlyPnl | null;
+}) {
+  const bulanIni = firstOfMonth();
+
+  return (
+    <div className="space-y-5">
+      <RingkasanBulan pnl={pnl} />
+      <TargetForm bulan={bulanIni} target={target} />
+      <BiayaOperasional bulan={bulanIni} categories={categories} expenses={expenses} />
+    </div>
+  );
+}
+
+function RingkasanBulan({ pnl }: { pnl: VMonthlyPnl | null }) {
+  if (!pnl) return null;
+  return (
+    <div className="rounded-xl border border-border bg-white p-4">
+      <div className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+        Laba Rugi Bulan Ini
+      </div>
+      <div className="mt-2 space-y-1.5 text-sm">
+        <Row label="Omset" value={fmtIDR(pnl.omset)} />
+        <Row label="Profit kotor (setelah HPP, ongkir, admin)" value={fmtIDR(pnl.profit_kotor)} />
+        <Row label="Spend iklan" value={`-${fmtIDR(pnl.spend_iklan)}`} />
+        <Row label="Biaya operasional" value={`-${fmtIDR(pnl.biaya_operasional)}`} />
+        <div className="my-1 border-t border-border" />
+        <Row label="Profit bersih" value={fmtIDR(pnl.profit_bersih)} bold />
+        {pnl.piutang > 0 && (
+          <div className="mt-1 text-xs text-offline">Piutang belum lunas: {fmtIDR(pnl.piutang)}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+  return (
+    <div className={`flex justify-between ${bold ? "font-bold" : "text-ink-soft"}`}>
+      <span>{label}</span>
+      <span className="num text-ink">{value}</span>
+    </div>
+  );
+}
+
+function TargetForm({ bulan, target }: { bulan: string; target: MonthlyTarget | null }) {
+  const [targetOmset, setTargetOmset] = useState(String(target?.target_omset ?? ""));
+  const [targetProfit, setTargetProfit] = useState(String(target?.target_profit ?? ""));
+  const [catatan, setCatatan] = useState(target?.catatan ?? "");
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setSavedMsg("");
+    const res = await upsertMonthlyTarget({
+      bulan,
+      targetOmset: parseFloat(targetOmset) || 0,
+      targetProfit: parseFloat(targetProfit) || 0,
+      catatan,
+    });
+    setSaving(false);
+    setSavedMsg(res.ok ? "Target disimpan" : res.error || "Gagal menyimpan");
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-white p-4">
+      <div className="text-sm font-bold">
+        Target Bulan {new Date(bulan).toLocaleDateString("id-ID", { month: "long", year: "numeric" })}
+      </div>
+      <form onSubmit={handleSubmit} className="mt-3 space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-soft">Target Omset</label>
+            <input
+              type="number"
+              min={0}
+              value={targetOmset}
+              onChange={(e) => setTargetOmset(e.target.value)}
+              placeholder="0"
+              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-soft">Target Profit Bersih</label>
+            <input
+              type="number"
+              min={0}
+              value={targetProfit}
+              onChange={(e) => setTargetProfit(e.target.value)}
+              placeholder="0"
+              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+            />
+          </div>
+        </div>
+        <input
+          type="text"
+          value={catatan}
+          onChange={(e) => setCatatan(e.target.value)}
+          placeholder="Catatan (opsional)"
+          className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+        />
+        {savedMsg && <div className="text-xs text-ink-soft">{savedMsg}</div>}
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {saving ? "Menyimpan..." : "Simpan Target"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function BiayaOperasional({
+  bulan,
+  categories,
+  expenses,
+}: {
+  bulan: string;
+  categories: ExpenseCategory[];
+  expenses: OperatingExpense[];
+}) {
+  const [tanggal, setTanggal] = useState(todayStr());
+  const [kategori, setKategori] = useState(categories[0]?.kode ?? "lainnya");
+  const [nominal, setNominal] = useState("");
+  const [catatan, setCatatan] = useState("");
+  const [berulang, setBerulang] = useState(false);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [copyMsg, setCopyMsg] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    const res = await addOperatingExpense({
+      tanggal,
+      kategori: kategori as OperatingExpense["kategori"],
+      nominal: parseFloat(nominal) || 0,
+      catatan,
+      berulang,
+    });
+    setSaving(false);
+    if (!res.ok) {
+      setError(res.error || "Gagal menyimpan");
+      return;
+    }
+    setNominal("");
+    setCatatan("");
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Hapus biaya ini?")) return;
+    await deleteOperatingExpense(id);
+  }
+
+  async function handleCopyRecurring() {
+    setCopyMsg("Menyalin...");
+    const res = await copyRecurringExpenses(bulan);
+    setCopyMsg(res.ok ? `${res.count ?? 0} biaya berulang disalin` : res.error || "Gagal");
+  }
+
+  const catName = (kode: string) => categories.find((c) => c.kode === kode)?.nama ?? kode;
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-sm font-bold">Biaya Operasional</div>
+        <button onClick={handleCopyRecurring} className="text-xs font-semibold text-primary">
+          Salin biaya berulang bulan lalu
+        </button>
+      </div>
+      {copyMsg && <div className="mb-2 text-xs text-ink-soft">{copyMsg}</div>}
+
+      <form onSubmit={handleSubmit} className="mb-4 space-y-3 rounded-xl border border-border bg-white p-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-soft">Tanggal</label>
+            <input
+              type="date"
+              value={tanggal}
+              max={todayStr()}
+              onChange={(e) => setTanggal(e.target.value)}
+              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-soft">Kategori</label>
+            <select
+              value={kategori}
+              onChange={(e) => setKategori(e.target.value)}
+              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+            >
+              {categories.map((c) => (
+                <option key={c.kode} value={c.kode}>
+                  {c.nama}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-soft">Nominal</label>
+          <input
+            type="number"
+            min={0}
+            value={nominal}
+            onChange={(e) => setNominal(e.target.value)}
+            placeholder="0"
+            className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+          />
+        </div>
+        <input
+          type="text"
+          value={catatan}
+          onChange={(e) => setCatatan(e.target.value)}
+          placeholder="Catatan (opsional)"
+          className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+        />
+        <label className="flex items-center gap-2 text-xs text-ink-soft">
+          <input type="checkbox" checked={berulang} onChange={(e) => setBerulang(e.target.checked)} />
+          Biaya berulang tiap bulan (gaji, listrik, sewa)
+        </label>
+        {error && <div className="text-sm text-accent">{error}</div>}
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {saving ? "Menyimpan..." : "Tambah Biaya"}
+        </button>
+      </form>
+
+      {expenses.length === 0 ? (
+        <div className="py-6 text-center text-sm text-ink-faint">Belum ada biaya operasional.</div>
+      ) : (
+        <div className="space-y-2">
+          {expenses.map((e) => (
+            <div
+              key={e.id}
+              className="flex items-center justify-between rounded-xl border border-border bg-white p-3"
+            >
+              <div>
+                <div className="text-sm font-medium">{catName(e.kategori)}</div>
+                <div className="text-xs text-ink-faint">
+                  {fmtDate(e.tanggal)}
+                  {e.catatan ? ` · ${e.catatan}` : ""}
+                  {e.berulang ? " · berulang" : ""}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="num text-sm font-semibold">{fmtIDR(e.nominal)}</div>
+                <button onClick={() => handleDelete(e.id)} className="text-xs text-accent">
+                  Hapus
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

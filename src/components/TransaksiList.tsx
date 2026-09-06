@@ -1,0 +1,196 @@
+"use client";
+
+import { useState } from "react";
+import { updateTransactionStatus, deleteTransaction } from "@/lib/transactions";
+import { fmtIDR, fmtDate, waLink } from "@/lib/format";
+import type { VTransaction } from "@/types/database";
+
+const FILTERS: [string, string][] = [
+  ["all", "Semua"],
+  ["online", "Online"],
+  ["offline", "Offline"],
+  ["proses", "Proses"],
+  ["belum", "Belum Lunas"],
+  ["rts", "RTS"],
+];
+
+export default function TransaksiList({
+  transactions,
+  currentUserId,
+  isAdmin,
+  initialFilter,
+}: {
+  transactions: VTransaction[];
+  currentUserId: string;
+  isAdmin: boolean;
+  initialFilter?: string;
+}) {
+  const [filter, setFilter] = useState(initialFilter || "all");
+
+  const filtered = transactions.filter((t) => {
+    if (filter === "all") return true;
+    if (filter === "online") return t.channel === "online";
+    if (filter === "offline") return t.channel === "offline";
+    if (filter === "proses") return t.status === "proses";
+    if (filter === "belum") return t.status === "belum";
+    if (filter === "rts") return t.status === "rts";
+    return true;
+  });
+
+  return (
+    <div>
+      <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+        {FILTERS.map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key)}
+            className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium ${
+              filter === key ? "bg-primary text-white" : "bg-white text-ink-soft"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="py-10 text-center text-sm text-ink-faint">
+          <div className="mb-2 text-2xl">🧾</div>
+          Belum ada transaksi.
+          <br />
+          Tap tombol + untuk menambah.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((t) => (
+            <TxCard key={t.id} t={t} currentUserId={currentUserId} isAdmin={isAdmin} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TxCard({
+  t,
+  currentUserId,
+  isAdmin,
+}: {
+  t: VTransaction;
+  currentUserId: string;
+  isAdmin: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const canEditStatus = isAdmin || t.created_by_uid === currentUserId;
+  const statusLabel =
+    t.channel === "online"
+      ? t.status === "proses"
+        ? "Proses"
+        : t.status === "selesai"
+          ? "Selesai"
+          : "RTS"
+      : t.status === "lunas"
+        ? "Lunas"
+        : "Belum Lunas";
+
+  async function handleStatusChange(newStatus: string) {
+    setBusy(true);
+    await updateTransactionStatus(t.id, newStatus);
+    setBusy(false);
+  }
+
+  async function handleDelete() {
+    if (!confirm("Hapus transaksi ini? Stok produk akan dikembalikan otomatis.")) return;
+    setBusy(true);
+    await deleteTransaction(t.id);
+    setBusy(false);
+  }
+
+  const wa = waLink(t.customer_phone);
+
+  return (
+    <div className="rounded-xl border border-border bg-white p-3.5">
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="text-sm font-bold">{t.produk_nama}</div>
+          <div className="text-xs text-ink-soft">
+            {t.customer} · {fmtDate(t.tanggal)} · qty {t.qty}
+          </div>
+        </div>
+        <div className="num text-sm font-bold">{fmtIDR(t.omset)}</div>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <Badge tone={t.channel === "online" ? "online" : "offline"}>
+          {t.channel === "online" ? "Online" : "Offline"}
+        </Badge>
+        <Badge tone={t.status === "rts" ? "danger" : "neutral"}>{statusLabel}</Badge>
+        {!t.affects_stock && <Badge tone="neutral">Data historis</Badge>}
+        <Badge tone="neutral">Profit {fmtIDR(t.profit_kotor)}</Badge>
+      </div>
+      {t.catatan && <div className="mt-2 text-xs italic text-ink-soft">&quot;{t.catatan}&quot;</div>}
+      {t.created_by && <div className="text-xs text-ink-faint">dicatat oleh {t.created_by}</div>}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {canEditStatus && (
+          <select
+            disabled={busy}
+            defaultValue={t.status}
+            onChange={(e) => handleStatusChange(e.target.value)}
+            className="rounded-lg border border-border px-2 py-1.5 text-xs"
+          >
+            {t.channel === "online" ? (
+              <>
+                <option value="proses">Proses</option>
+                <option value="selesai">Selesai</option>
+                <option value="rts">RTS</option>
+              </>
+            ) : (
+              <>
+                <option value="lunas">Lunas</option>
+                <option value="belum">Belum Lunas</option>
+              </>
+            )}
+          </select>
+        )}
+        {wa && (
+          <a
+            href={wa}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-border px-2 py-1.5 text-xs font-medium text-primary"
+          >
+            Chat WA
+          </a>
+        )}
+        {isAdmin && (
+          <button
+            disabled={busy}
+            onClick={handleDelete}
+            className="rounded-lg border border-accent/30 px-2 py-1.5 text-xs font-medium text-accent"
+          >
+            Hapus
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Badge({
+  tone,
+  children,
+}: {
+  tone: "online" | "offline" | "danger" | "neutral";
+  children: React.ReactNode;
+}) {
+  const cls =
+    tone === "online"
+      ? "bg-online/10 text-online"
+      : tone === "offline"
+        ? "bg-offline/10 text-offline"
+        : tone === "danger"
+          ? "bg-accent/10 text-accent"
+          : "bg-surface text-ink-soft";
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${cls}`}>{children}</span>
+  );
+}
