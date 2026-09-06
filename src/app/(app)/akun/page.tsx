@@ -43,6 +43,13 @@ export default async function AkunPage() {
       </div>
 
       <Link
+        href="/kalender"
+        className="block rounded-lg border border-border bg-white py-2.5 text-center text-sm font-medium"
+      >
+        Kalender Harian
+      </Link>
+
+      <Link
         href="/pelanggan"
         className="block rounded-lg border border-border bg-white py-2.5 text-center text-sm font-medium"
       >

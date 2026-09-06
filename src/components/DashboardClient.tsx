@@ -232,6 +232,12 @@ export default function DashboardClient({
 
       <div className="space-y-2 pt-1">
         <Link
+          href="/kalender"
+          className="block rounded-lg border border-border bg-white py-2.5 text-center text-sm font-medium"
+        >
+          Lihat Kalender Harian →
+        </Link>
+        <Link
           href="/pelanggan"
           className="block rounded-lg border border-border bg-white py-2.5 text-center text-sm font-medium"
         >
