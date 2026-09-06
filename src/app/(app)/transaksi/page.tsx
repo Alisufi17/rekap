@@ -11,7 +11,7 @@ export default async function TransaksiPage({
   searchParams: Promise<{ filter?: string }>;
 }) {
   const { filter } = await searchParams;
-  const { userId, profile } = await getCurrentProfile();
+  const { profile } = await getCurrentProfile();
   const supabase = await createClient();
   const { data } = await supabase
     .from("v_transactions")
@@ -22,7 +22,6 @@ export default async function TransaksiPage({
   return (
     <TransaksiList
       transactions={(data ?? []) as VTransaction[]}
-      currentUserId={userId}
       isAdmin={isAdmin(profile)}
       initialFilter={filter}
     />

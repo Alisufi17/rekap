@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile, isAdmin } from "@/lib/auth";
 import type { TxStatus } from "@/types/database";
 
 export interface ActionResult {
@@ -63,21 +62,12 @@ export async function createTransaction(input: {
   return { ok: true };
 }
 
+// Semua anggota tim (admin & staff) boleh mengonfirmasi status transaksi
+// siapa saja — alur kerjanya saling menindaklanjuti satu sama lain. Hapus
+// transaksi tetap admin-only (lihat deleteTransaction), itu tindakan yang
+// lebih berisiko dan tidak termasuk yang diminta dibuka untuk staff.
 export async function updateTransactionStatus(id: string, status: string): Promise<ActionResult> {
   const supabase = await createClient();
-  const { userId, profile } = await getCurrentProfile();
-
-  const { data: tx } = await supabase
-    .from("transactions")
-    .select("created_by_uid")
-    .eq("id", id)
-    .single();
-
-  if (!tx) return { ok: false, error: "Transaksi tidak ditemukan" };
-  if (!isAdmin(profile) && tx.created_by_uid !== userId) {
-    return { ok: false, error: "Hanya bisa mengubah transaksi milik sendiri" };
-  }
-
   const { error } = await supabase
     .from("transactions")
     .update({ status: status as TxStatus })

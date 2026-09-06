@@ -16,12 +16,10 @@ const FILTERS: [string, string][] = [
 
 export default function TransaksiList({
   transactions,
-  currentUserId,
   isAdmin,
   initialFilter,
 }: {
   transactions: VTransaction[];
-  currentUserId: string;
   isAdmin: boolean;
   initialFilter?: string;
 }) {
@@ -63,7 +61,7 @@ export default function TransaksiList({
       ) : (
         <div className="space-y-3">
           {filtered.map((t) => (
-            <TxCard key={t.id} t={t} currentUserId={currentUserId} isAdmin={isAdmin} />
+            <TxCard key={t.id} t={t} isAdmin={isAdmin} />
           ))}
         </div>
       )}
@@ -71,17 +69,8 @@ export default function TransaksiList({
   );
 }
 
-function TxCard({
-  t,
-  currentUserId,
-  isAdmin,
-}: {
-  t: VTransaction;
-  currentUserId: string;
-  isAdmin: boolean;
-}) {
+function TxCard({ t, isAdmin }: { t: VTransaction; isAdmin: boolean }) {
   const [busy, setBusy] = useState(false);
-  const canEditStatus = isAdmin || t.created_by_uid === currentUserId;
   const statusLabel =
     t.channel === "online"
       ? t.status === "proses"
@@ -130,27 +119,25 @@ function TxCard({
       {t.catatan && <div className="mt-2 text-xs italic text-ink-soft">&quot;{t.catatan}&quot;</div>}
       {t.created_by && <div className="text-xs text-ink-faint">dicatat oleh {t.created_by}</div>}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {canEditStatus && (
-          <select
-            disabled={busy}
-            defaultValue={t.status}
-            onChange={(e) => handleStatusChange(e.target.value)}
-            className="rounded-lg border border-border px-2 py-1.5 text-xs"
-          >
-            {t.channel === "online" ? (
-              <>
-                <option value="proses">Proses</option>
-                <option value="selesai">Selesai</option>
-                <option value="rts">RTS</option>
-              </>
-            ) : (
-              <>
-                <option value="lunas">Lunas</option>
-                <option value="belum">Belum Lunas</option>
-              </>
-            )}
-          </select>
-        )}
+        <select
+          disabled={busy}
+          defaultValue={t.status}
+          onChange={(e) => handleStatusChange(e.target.value)}
+          className="rounded-lg border border-border px-2 py-1.5 text-xs"
+        >
+          {t.channel === "online" ? (
+            <>
+              <option value="proses">Proses</option>
+              <option value="selesai">Selesai</option>
+              <option value="rts">RTS</option>
+            </>
+          ) : (
+            <>
+              <option value="lunas">Lunas</option>
+              <option value="belum">Belum Lunas</option>
+            </>
+          )}
+        </select>
         {wa && (
           <a
             href={wa}
