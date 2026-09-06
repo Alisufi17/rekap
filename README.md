@@ -9,47 +9,44 @@ Live saat ini: https://kasirkiojay.vercel.app
 
 | Bagian | Status |
 | --- | --- |
-| Skema database (role, biaya operasional, target, mesin stok, view keuangan) | **Selesai ditulis, belum dijalankan** |
-| Frontend Next.js (dashboard, transaksi, produk, keuangan, pelanggan, akun) | **Ditulis lengkap, belum pernah di-`npm install` / dijalankan / di-build** — lihat peringatan di bawah |
-| Repo Git | Sudah (`git init` + 2 commit) |
+| Skema database (role, biaya operasional, target, mesin stok, view keuangan) | Ditulis, **belum dijalankan ke Supabase** — perlu izin eksplisit karena ini database produksi |
+| Frontend Next.js (dashboard, transaksi, produk, keuangan, pelanggan, akun) | `typecheck`, `lint`, `build` lulus. Halaman `/login` diuji langsung di browser (desktop & mobile) dan berhasil memanggil Supabase Auth asli. Halaman lain (dashboard dll) **belum bisa diuji** — butuh tabel/view dari migrasi di atas |
+| Repo Git | Sudah (`git init`, beberapa commit) |
 | Auto-deploy Vercel | Belum |
 
-⚠️ **Kode frontend belum pernah dijalankan sama sekali.** Ditulis manual tanpa
-`npm install`, `next dev`, atau `tsc` karena Node.js gagal terpasang di mesin
-ini (lihat Prasyarat). Kemungkinan ada typo, import salah, atau ketidakcocokan
-versi paket yang baru kelihatan saat pertama kali dijalankan. Jalankan
-`npm run typecheck` dan `npm run dev` lalu perbaiki error yang muncul sebelum
-menganggap bagian ini selesai.
+Dua bug ditemukan & diperbaiki saat verifikasi pertama (detail di riwayat
+commit `fix: perbaiki tipe database & versi @supabase/ssr`): versi
+`@supabase/ssr` yang tidak cocok dengan `@supabase/supabase-js`, dan
+`interface` di `src/types/database.ts` yang seharusnya `type` alias (TypeScript
+gotcha — interface tidak punya index signature tersirat, dibutuhkan
+`@supabase/postgrest-js` untuk menurunkan tipe insert/update).
 
 ## Prasyarat
 
-Node.js belum berhasil terpasang di mesin ini — instalasi lewat `winget`
-berulang kali berhenti menunggu **prompt izin admin (UAC)** yang tidak
-ter-approve (kemungkinan karena dijalankan dari sesi non-interaktif). Pasang
-sendiri lewat salah satu cara ini:
+Node.js sempat gagal terpasang lewat `winget` di sesi otomatis (macet
+menunggu prompt izin admin/UAC yang tidak ada desktop interaktif untuk
+mengkliknya). Diatasi dengan memasang **Node.js portable** (zip, tanpa
+installer/tanpa admin) dari nodejs.org, diekstrak ke
+`%LOCALAPPDATA%\nodejs-portable`, dan ditambahkan ke PATH level-user lewat
+`[Environment]::SetEnvironmentVariable(...,"User")` — tidak menyentuh
+pengaturan admin/mesin sama sekali.
 
-**Cara 1 — winget** (jalankan dari PowerShell/Command Prompt kamu sendiri,
-bukan lewat Claude, supaya prompt UAC bisa langsung diklik):
+**Kalau kamu buka terminal baru dan `node -v` belum ketemu**, tutup lalu buka
+lagi terminalnya (PATH level-user baru kebaca di proses baru). Kalau masih
+belum ketemu juga, pasang manual:
 ```
 winget install OpenJS.NodeJS.LTS
 ```
+atau unduh installer `.msi` versi LTS dari https://nodejs.org.
 
-**Cara 2 — installer manual** kalau winget tetap bermasalah: unduh installer
-`.msi` versi LTS dari https://nodejs.org, jalankan, ikuti wizard-nya.
-
-Setelah salah satu selesai, **tutup dan buka ulang terminal**, cek dengan:
-```
-node -v
-npm -v
-```
-
-Lalu jalankan:
+Setelah `node -v` dan `npm -v` jalan:
 ```
 npm install
 npm run dev
 ```
 Buka `http://localhost:3000` — akan redirect ke `/login`. Login pakai akun
-Supabase yang sama dengan `kasirkiojay.vercel.app`.
+Supabase yang sama dengan `kasirkiojay.vercel.app`. Halaman setelah login baru
+akan berfungsi penuh setelah migrasi SQL di bawah dijalankan.
 
 ## Menjalankan migrasi
 
