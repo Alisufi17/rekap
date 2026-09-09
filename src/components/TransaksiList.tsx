@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { updateTransactionStatus, deleteTransaction } from "@/lib/transactions";
-import { fmtIDR, fmtDate, waLink } from "@/lib/format";
+import { fmtIDR, fmtDate, waLink, todayStr } from "@/lib/format";
+import { rangeForPreset, type PresetKey } from "@/lib/dashboard";
 import type { VTransaction } from "@/types/database";
 
 const FILTERS: [string, string][] = [
@@ -12,6 +13,14 @@ const FILTERS: [string, string][] = [
   ["proses", "Proses"],
   ["belum", "Belum Lunas"],
   ["rts", "RTS"],
+];
+
+const DATE_PRESETS: [PresetKey | "semua", string][] = [
+  ["hari_ini", "Hari ini"],
+  ["kemarin", "Kemarin"],
+  ["7_hari", "7 hari"],
+  ["30_hari", "30 hari"],
+  ["semua", "Semua"],
 ];
 
 export default function TransaksiList({
@@ -24,8 +33,22 @@ export default function TransaksiList({
   initialFilter?: string;
 }) {
   const [filter, setFilter] = useState(initialFilter || "all");
+  // Kalau datang dari link alarm Dashboard (mis. "proses"/"belum"), jangan
+  // batasi tanggal — transaksinya bisa saja lebih lama dari 7 hari terakhir.
+  const [datePreset, setDatePreset] = useState<PresetKey | "semua">(
+    initialFilter ? "semua" : "7_hari"
+  );
+  const [customDate, setCustomDate] = useState(todayStr());
+  const [useCustomDate, setUseCustomDate] = useState(false);
 
-  const filtered = transactions.filter((t) => {
+  const dateFiltered = useMemo(() => {
+    if (useCustomDate) return transactions.filter((t) => t.tanggal === customDate);
+    if (datePreset === "semua") return transactions;
+    const range = rangeForPreset(datePreset);
+    return transactions.filter((t) => t.tanggal >= range.from && t.tanggal <= range.to);
+  }, [transactions, datePreset, useCustomDate, customDate]);
+
+  const filtered = dateFiltered.filter((t) => {
     if (filter === "all") return true;
     if (filter === "online") return t.channel === "online";
     if (filter === "offline") return t.channel === "offline";
@@ -35,8 +58,49 @@ export default function TransaksiList({
     return true;
   });
 
+  const groups = useMemo(() => {
+    const map = new Map<string, VTransaction[]>();
+    filtered.forEach((t) => {
+      const list = map.get(t.tanggal);
+      if (list) list.push(t);
+      else map.set(t.tanggal, [t]);
+    });
+    return Array.from(map.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  }, [filtered]);
+
+  function pickDatePreset(p: PresetKey | "semua") {
+    setDatePreset(p);
+    setUseCustomDate(false);
+  }
+
   return (
     <div>
+      <div className="mb-2 flex flex-wrap gap-1.5 rounded-lg bg-white p-1.5 text-xs">
+        {DATE_PRESETS.map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => pickDatePreset(key)}
+            className={`rounded-md px-2.5 py-1.5 font-medium ${
+              !useCustomDate && datePreset === key ? "bg-primary text-white" : "text-ink-soft"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <input
+          type="date"
+          value={customDate}
+          max={todayStr()}
+          onChange={(e) => {
+            setCustomDate(e.target.value);
+            setUseCustomDate(true);
+          }}
+          className={`rounded-md border px-2 py-1.5 text-xs ${
+            useCustomDate ? "border-primary text-ink" : "border-border text-ink-soft"
+          }`}
+        />
+      </div>
+
       <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
         {FILTERS.map(([key, label]) => (
           <button
@@ -51,20 +115,52 @@ export default function TransaksiList({
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {groups.length === 0 ? (
         <div className="py-10 text-center text-sm text-ink-faint">
           <div className="mb-2 text-2xl">🧾</div>
-          Belum ada transaksi.
-          <br />
-          Tap tombol + untuk menambah.
+          Belum ada transaksi di periode ini.
         </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((t) => (
-            <TxCard key={t.id} t={t} isAdmin={isAdmin} />
+        <div className="space-y-5">
+          {groups.map(([tanggal, txs]) => (
+            <DateGroup key={tanggal} tanggal={tanggal} transactions={txs} isAdmin={isAdmin} />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function DateGroup({
+  tanggal,
+  transactions,
+  isAdmin,
+}: {
+  tanggal: string;
+  transactions: VTransaction[];
+  isAdmin: boolean;
+}) {
+  const omsetTerkonfirmasi = transactions
+    .filter((t) => t.terkonfirmasi)
+    .reduce((s, t) => s + t.omset, 0);
+  const isToday = tanggal === todayStr();
+
+  return (
+    <div>
+      <div className="mb-2 flex items-baseline justify-between px-0.5">
+        <div className="text-sm font-bold">
+          {fmtDate(tanggal)}
+          {isToday && <span className="ml-1.5 text-xs font-medium text-primary">· Hari ini</span>}
+        </div>
+        <div className="text-xs text-ink-soft">
+          {transactions.length} transaksi · <span className="num">{fmtIDR(omsetTerkonfirmasi)}</span>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {transactions.map((t) => (
+          <TxCard key={t.id} t={t} isAdmin={isAdmin} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -103,7 +199,7 @@ function TxCard({ t, isAdmin }: { t: VTransaction; isAdmin: boolean }) {
         <div>
           <div className="text-sm font-bold">{t.produk_nama}</div>
           <div className="text-xs text-ink-soft">
-            {t.customer} · {fmtDate(t.tanggal)} · qty {t.qty}
+            {t.customer} · qty {t.qty}
           </div>
         </div>
         <div className="num text-sm font-bold">{fmtIDR(t.omset)}</div>

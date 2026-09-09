@@ -3,7 +3,14 @@ import type { VTransaction, DailyMetric } from "@/types/database";
 
 export type DateRange = { from: string; to: string };
 
-export type PresetKey = "hari_ini" | "7_hari" | "30_hari" | "bulan_ini" | "bulan_lalu" | "custom";
+export type PresetKey =
+  | "hari_ini"
+  | "kemarin"
+  | "7_hari"
+  | "30_hari"
+  | "bulan_ini"
+  | "bulan_lalu"
+  | "custom";
 
 function inRange(tanggal: string, range: DateRange) {
   return tanggal >= range.from && tanggal <= range.to;
@@ -15,6 +22,12 @@ export function rangeForPreset(preset: PresetKey, custom?: DateRange): DateRange
   const todayStr = localDateStr(today);
 
   if (preset === "hari_ini") return { from: todayStr, to: todayStr };
+
+  if (preset === "kemarin") {
+    const y = new Date(today);
+    y.setDate(y.getDate() - 1);
+    return { from: localDateStr(y), to: localDateStr(y) };
+  }
 
   if (preset === "7_hari") {
     const from = new Date(today);
@@ -44,11 +57,74 @@ export function rangeForPreset(preset: PresetKey, custom?: DateRange): DateRange
 
 export function rangeLabel(preset: PresetKey, range: DateRange): string {
   if (preset === "hari_ini") return "Hari ini";
+  if (preset === "kemarin") return "Kemarin";
   if (preset === "7_hari") return "7 hari terakhir";
   if (preset === "30_hari") return "30 hari terakhir";
   if (preset === "bulan_ini") return "Bulan ini";
   if (preset === "bulan_lalu") return "Bulan lalu";
   return range.from === range.to ? range.from : `${range.from} s/d ${range.to}`;
+}
+
+export interface DayStats {
+  date: string;
+  omset: number;
+  totalTx: number;
+  produk: { nama: string; qty: number }[];
+  totalSpend: number;
+  totalChat: number;
+  konversi: number;
+}
+
+function computeDayStats(
+  transactions: VTransaction[],
+  dailyMetrics: DailyMetric[],
+  date: string
+): DayStats {
+  const dayTx = transactions.filter((t) => t.tanggal === date);
+  const confirmedTx = dayTx.filter((t) => t.terkonfirmasi);
+  const omset = confirmedTx.reduce((s, t) => s + t.omset, 0);
+
+  // Qty per produk dihitung dari SEMUA transaksi hari itu (bukan cuma yang
+  // sudah terkonfirmasi) — ini pertanyaan operasional ("berapa paket
+  // dikirim hari ini"), bukan pertanyaan keuangan, jadi tetap dihitung
+  // walau status masih Proses/Belum Lunas.
+  const prodMap: Record<string, number> = {};
+  dayTx.forEach((t) => {
+    prodMap[t.produk_nama] = (prodMap[t.produk_nama] ?? 0) + t.qty;
+  });
+  const produk = Object.entries(prodMap)
+    .map(([nama, qty]) => ({ nama, qty }))
+    .sort((a, b) => b.qty - a.qty);
+
+  const metric = dailyMetrics.find((m) => m.tanggal === date);
+  const totalSpend = metric?.spend_iklan ?? 0;
+  const totalChat = metric?.chat_masuk ?? 0;
+  const konversi = totalChat > 0 ? (dayTx.length / totalChat) * 100 : 0;
+
+  return { date, omset, totalTx: dayTx.length, produk, totalSpend, totalChat, konversi };
+}
+
+export interface DayComparison {
+  today: DayStats;
+  yesterday: DayStats;
+}
+
+// Perbandingan hari-ini-vs-kemarin yang selalu tampil di atas dashboard,
+// lepas dari preset periode yang dipilih user di bawahnya — supaya evaluasi
+// harian tidak perlu klak-klik pilih periode dulu.
+export function computeDayComparison(
+  transactions: VTransaction[],
+  dailyMetrics: DailyMetric[]
+): DayComparison {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  return {
+    today: computeDayStats(transactions, dailyMetrics, localDateStr(today)),
+    yesterday: computeDayStats(transactions, dailyMetrics, localDateStr(yesterday)),
+  };
 }
 
 export interface DashboardStats {

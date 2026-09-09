@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   computeDashboard,
+  computeDayComparison,
   rangeForPreset,
   rangeLabel,
   type PresetKey,
@@ -15,6 +16,7 @@ import type { VTransaction, DailyMetric, VMonthlyPnl, Product } from "@/types/da
 
 const PRESETS: [PresetKey, string][] = [
   ["hari_ini", "Hari ini"],
+  ["kemarin", "Kemarin"],
   ["7_hari", "7 hari"],
   ["30_hari", "30 hari"],
   ["bulan_ini", "Bulan ini"],
@@ -51,6 +53,7 @@ export default function DashboardClient({
 
   const range = preset === "custom" ? customRange : rangeForPreset(preset);
   const d = computeDashboard(transactions, dailyMetrics, range);
+  const cmp = computeDayComparison(transactions, dailyMetrics);
 
   function applyPreset(p: PresetKey) {
     setPreset(p);
@@ -78,6 +81,76 @@ export default function DashboardClient({
           </div>
         </div>
       )}
+
+      <div className="rounded-xl border-2 border-primary/20 bg-white p-4">
+        <div className="mb-2.5 flex items-center justify-between">
+          <div className="text-sm font-bold">Ringkasan Hari Ini</div>
+          <div className="text-xs text-ink-faint">{fmtDate(cmp.today.date)} vs kemarin</div>
+        </div>
+        <div className="space-y-2">
+          <CompareRow
+            label="Omset"
+            today={fmtIDR(cmp.today.omset)}
+            yesterday={fmtIDR(cmp.yesterday.omset)}
+            up={cmp.today.omset >= cmp.yesterday.omset}
+            judged
+          />
+          <CompareRow
+            label="Transaksi"
+            today={String(cmp.today.totalTx)}
+            yesterday={String(cmp.yesterday.totalTx)}
+            up={cmp.today.totalTx >= cmp.yesterday.totalTx}
+            judged
+          />
+          {isAdmin && (
+            <>
+              <CompareRow
+                label="Spend Iklan"
+                today={fmtIDR(cmp.today.totalSpend)}
+                yesterday={fmtIDR(cmp.yesterday.totalSpend)}
+                up={cmp.today.totalSpend >= cmp.yesterday.totalSpend}
+              />
+              <CompareRow
+                label="Chat Masuk"
+                today={String(cmp.today.totalChat)}
+                yesterday={String(cmp.yesterday.totalChat)}
+                up={cmp.today.totalChat >= cmp.yesterday.totalChat}
+                judged
+              />
+              <CompareRow
+                label="Closing (transaksi/chat)"
+                today={`${cmp.today.konversi.toFixed(1)}%`}
+                yesterday={`${cmp.yesterday.konversi.toFixed(1)}%`}
+                up={cmp.today.konversi >= cmp.yesterday.konversi}
+                judged
+              />
+            </>
+          )}
+        </div>
+        <div className="mt-3 border-t border-border pt-3">
+          <div className="mb-1.5 text-xs font-semibold text-ink-soft">Terjual Hari Ini per Produk</div>
+          {cmp.today.produk.length === 0 ? (
+            <div className="text-xs text-ink-faint">Belum ada transaksi hari ini.</div>
+          ) : (
+            <div className="space-y-1">
+              {cmp.today.produk.map((p) => {
+                const qtyKemarin = cmp.yesterday.produk.find((x) => x.nama === p.nama)?.qty ?? 0;
+                return (
+                  <div key={p.nama} className="flex items-center justify-between text-sm">
+                    <span>{p.nama}</span>
+                    <span className="num font-medium">
+                      {p.qty} pcs{" "}
+                      <span className="text-xs font-normal text-ink-faint">
+                        (kemarin {qtyKemarin})
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
       {isAdmin && monthlyPnl && (monthlyPnl.target_omset || monthlyPnl.target_profit) ? (
         <div className="rounded-xl border border-border bg-white p-4">
@@ -156,32 +229,40 @@ export default function DashboardClient({
         </div>
       )}
 
-      <div className="rounded-xl bg-primary p-4 text-white">
-        <div className="text-xs opacity-80">Omset Terkonfirmasi · {rangeLabel(preset, range)}</div>
-        <div className="num mt-1 text-2xl font-extrabold">{fmtIDR(d.omset)}</div>
-        <div className="mt-3 flex justify-between text-xs opacity-90">
-          <div>
-            Profit <b className="num block">{fmtIDR(d.profitKotor)}</b>
+      <div className="text-xs text-ink-faint">{rangeLabel(preset, range)}</div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-3.5">
+          <div className="text-xs font-medium text-ink-soft">Perkiraan Omset</div>
+          <div className="num mt-1 text-lg font-extrabold text-ink">{fmtIDR(d.estimasiOmset)}</div>
+          <div className="mt-1.5 text-xs text-ink-faint">
+            Omset Proses{" "}
+            <span className="num font-medium text-ink-soft">{fmtIDR(d.pendingOmset)}</span>
           </div>
-          <div>
-            Transaksi <b className="num block">{d.totalTx}</b>
+        </div>
+        <div className="rounded-xl bg-primary p-3.5 text-white">
+          <div className="text-xs opacity-80">Omset Fix</div>
+          <div className="num mt-1 text-lg font-extrabold">{fmtIDR(d.omset)}</div>
+          <div className="mt-1.5 text-xs opacity-90">
+            Profit Fix <span className="num font-medium">{fmtIDR(d.profitKotor)}</span>
           </div>
-          <div>
-            Margin{" "}
-            <b className="num block">
-              {d.omset > 0 ? Math.round((d.profitKotor / d.omset) * 100) : 0}%
-            </b>
-          </div>
+        </div>
+      </div>
+      <div className="flex justify-between rounded-xl border border-border bg-white px-4 py-2.5 text-xs">
+        <div>
+          Transaksi <b className="num">{d.totalTx}</b>
+        </div>
+        <div>
+          Margin{" "}
+          <b className="num">{d.omset > 0 ? Math.round((d.profitKotor / d.omset) * 100) : 0}%</b>
         </div>
       </div>
 
       {d.pendingCount > 0 && (
         <div className="flex items-center justify-between rounded-xl border-l-4 border-primary bg-white p-3">
           <div>
-            <div className="text-sm font-bold">Estimasi: +{fmtIDR(d.pendingOmset)}</div>
+            <div className="text-sm font-bold">{d.pendingCount} transaksi masih Proses</div>
             <div className="text-xs text-ink-soft">
-              {d.pendingCount} transaksi online masih &quot;Proses&quot; — omset baru fix setelah
-              dikonfirmasi Selesai/RTS
+              Omset jadi fix setelah dikonfirmasi Selesai/RTS
             </div>
           </div>
           <Link
@@ -356,6 +437,36 @@ function TargetBar({
           style={{ width: `${pct}%` }}
         />
       </div>
+    </div>
+  );
+}
+
+function CompareRow({
+  label,
+  today,
+  yesterday,
+  up,
+  judged,
+}: {
+  label: string;
+  today: string;
+  yesterday: string;
+  up: boolean;
+  /** Kalau true, panah diwarnai hijau/merah (naik = bagus). Kalau false
+   * (mis. Spend Iklan), panah cuma penanda arah netral — naik tidak
+   * otomatis berarti buruk. */
+  judged?: boolean;
+}) {
+  const arrow = up ? "▲" : "▼";
+  const arrowColor = !judged ? "text-ink-faint" : up ? "text-primary" : "text-accent";
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-ink-soft">{label}</span>
+      <span className="flex items-baseline gap-1.5">
+        <span className="num font-semibold">{today}</span>
+        <span className={`text-xs ${arrowColor}`}>{arrow}</span>
+        <span className="num text-xs text-ink-faint">kmrn {yesterday}</span>
+      </span>
     </div>
   );
 }
