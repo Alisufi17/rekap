@@ -139,6 +139,10 @@ export type VMonthlyPnl = {
   target_profit: number | null;
   capaian_omset_persen: number | null;
   capaian_profit_persen: number | null;
+  jumlah_transaksi_semua: number;
+  biaya_packing_bahan: number;
+  biaya_packing_hansen: number;
+  biaya_packing_total: number;
 };
 
 // `Relationships` dan `Functions` di bawah wajib ada persis dengan nama field

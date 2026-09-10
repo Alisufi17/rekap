@@ -61,6 +61,17 @@ function RingkasanBulan({ pnl }: { pnl: VMonthlyPnl | null }) {
           <div className="mt-1 text-xs text-offline">Piutang belum lunas: {fmtIDR(pnl.piutang)}</div>
         )}
       </div>
+
+      <div className="mt-3 rounded-lg bg-surface p-3 text-xs">
+        <div className="mb-1.5 font-semibold text-ink-soft">Rincian Biaya Packing</div>
+        <Row label="Bahan (kardus, lakban, dll)" value={fmtIDR(pnl.biaya_packing_bahan)} />
+        <Row
+          label={`Upah Hansen (${pnl.jumlah_transaksi_semua} transaksi × Rp2.000)`}
+          value={fmtIDR(pnl.biaya_packing_hansen)}
+        />
+        <div className="my-1 border-t border-border" />
+        <Row label="Total Biaya Packing" value={fmtIDR(pnl.biaya_packing_total)} bold />
+      </div>
     </div>
   );
 }

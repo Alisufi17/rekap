@@ -259,32 +259,84 @@ export default function DashboardClient({
       )}
 
       <div className="text-xs text-ink-faint">{rangeLabel(preset, range)}</div>
+
       <div className="rounded-xl border border-border bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
-          <div className="text-xs font-semibold text-ink-soft">Estimasi Omset (kalau semua masuk cair)</div>
+          <div className="text-xs font-semibold text-ink-soft">Perkiraan Omset</div>
           <div className="num text-base font-extrabold">{fmtIDR(d.estimasiOmset)}</div>
         </div>
         <div className="space-y-2">
           <BreakdownRow
             tone="confirmed"
-            label="Terkonfirmasi"
+            label="Omset Terkonfirmasi"
             count={d.confirmedCount}
             value={d.omset}
           />
-          <BreakdownRow tone="pending" label="Masuk (Proses/Piutang)" count={d.masukCount} value={d.masukOmset} />
+          <BreakdownRow tone="pending" label="Masih Proses" count={d.masukCount} value={d.masukOmset} />
           <BreakdownRow tone="rts" label="RTS (Retur)" count={d.rtsList.length} value={d.rtsOmset} />
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border bg-white p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-xs font-semibold text-ink-soft">Perkiraan Profit</div>
+          <div className="num text-base font-extrabold">{fmtIDR(d.estimasiProfit)}</div>
+        </div>
+        <div className="space-y-2">
+          <BreakdownRow
+            tone="confirmed"
+            label="Profit Terkonfirmasi"
+            count={d.confirmedCount}
+            value={d.profitKotor}
+          />
+          <BreakdownRow tone="pending" label="Profit Masih Proses" count={d.masukCount} value={d.masukProfit} />
         </div>
         <div className="mt-3 flex justify-between border-t border-border pt-2.5 text-xs">
           <div>
-            Profit (dari yang Terkonfirmasi){" "}
-            <b className="num">{fmtIDR(d.profitKotor)}</b>
+            Transaksi <b className="num">{d.totalTx}</b>
           </div>
           <div>
             Margin{" "}
             <b className="num">{d.omset > 0 ? Math.round((d.profitKotor / d.omset) * 100) : 0}%</b>
           </div>
         </div>
+        {isAdmin && (
+          <div
+            className={`mt-3 rounded-lg p-2.5 ${
+              d.netProfitEstimasi >= 0 ? "bg-primary/10" : "bg-accent/10"
+            }`}
+          >
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-semibold text-ink-soft">Potensi Profit (net iklan)</span>
+              <span
+                className={`num font-bold ${
+                  d.netProfitEstimasi >= 0 ? "text-primary" : "text-accent"
+                }`}
+              >
+                {fmtIDR(d.netProfitEstimasi)}
+              </span>
+            </div>
+            <div className="mt-0.5 text-xs text-ink-faint">
+              {d.netProfitEstimasi >= 0 ? "Untung" : "Rugi"} kalau semua yang Masih Proses cair,
+              sudah dikurangi spend iklan {fmtIDR(d.totalSpend)}
+            </div>
+          </div>
+        )}
       </div>
+
+      {d.produkQtyPeriode.length > 0 && (
+        <div className="rounded-xl border border-border bg-white p-4">
+          <div className="mb-2 text-xs font-semibold text-ink-soft">Qty Terjual per Produk</div>
+          <div className="space-y-1">
+            {d.produkQtyPeriode.map((p) => (
+              <div key={p.nama} className="flex items-center justify-between text-sm">
+                <span>{p.nama}</span>
+                <span className="num font-medium">{p.qty} pcs</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {d.pendingCount > 0 && (
         <div className="flex items-center justify-between rounded-xl border-l-4 border-primary bg-white p-3">

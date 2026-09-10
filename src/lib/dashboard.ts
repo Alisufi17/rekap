@@ -157,19 +157,26 @@ export interface DashboardStats {
   countOnline: number;
   countOffline: number;
   topProduk: [string, { qty: number; omset: number }][];
+  produkQtyPeriode: { nama: string; qty: number }[];
   rtsList: VTransaction[];
   rtsOmset: number;
   piutang: number;
   piutangCount: number;
+  piutangProfit: number;
   pendingOmset: number;
   pendingProfit: number;
   pendingCount: number;
   // "Masuk" = gabungan yang masih diproses (online) + piutang (offline) —
-  // dua-duanya sama-sama belum pasti jadi omset final.
+  // dua-duanya sama-sama belum pasti jadi omset/profit final.
   masukOmset: number;
+  masukProfit: number;
   masukCount: number;
   estimasiOmset: number;
   estimasiProfit: number;
+  // Potensi profit kalau semua yang Masuk berhasil cair, dikurangi spend
+  // iklan periode ini — supaya kelihatan untung/rugi bersih, bukan cuma
+  // profit kotor penjualan.
+  netProfitEstimasi: number;
   totalSpend: number;
   totalChat: number;
   cpc: number;
@@ -265,6 +272,18 @@ export function computeDashboard(
     .sort((a, b) => b[1].omset - a[1].omset)
     .slice(0, 5);
 
+  // Qty per produk dari SEMUA transaksi di periode ini apapun statusnya —
+  // pertanyaan operasional ("hari ini terjual berapa bibit/paket"), bukan
+  // cuma yang sudah terkonfirmasi.
+  const allInPeriod = transactions.filter((t) => inRange(t.tanggal, range));
+  const qtyMap: Record<string, number> = {};
+  allInPeriod.forEach((t) => {
+    qtyMap[t.produk_nama] = (qtyMap[t.produk_nama] ?? 0) + t.qty;
+  });
+  const produkQtyPeriode = Object.entries(qtyMap)
+    .map(([nama, qty]) => ({ nama, qty }))
+    .sort((a, b) => b.qty - a.qty);
+
   const rtsList = transactions.filter((t) => t.retur && inRange(t.tanggal, range));
   const rtsOmset = rtsList.reduce((s, t) => s + t.omset, 0);
 
@@ -275,10 +294,12 @@ export function computeDashboard(
   const piutangTx = transactions.filter((t) => t.piutang && inRange(t.tanggal, range));
   const piutang = piutangTx.reduce((s, t) => s + t.omset, 0);
   const piutangCount = piutangTx.length;
+  const piutangProfit = piutangTx.reduce((s, t) => s + t.profit_kotor, 0);
 
   // "Masuk" = online masih Proses + offline Belum Lunas — dua-duanya sudah
   // diserahkan/diproses tapi uangnya belum pasti final.
   const masukOmset = pendingOmset + piutang;
+  const masukProfit = pendingProfit + piutangProfit;
   const masukCount = pendingTx.length + piutangCount;
 
   const metricsInPeriod = dailyMetrics.filter((m) => inRange(m.tanggal, range));
@@ -288,6 +309,9 @@ export function computeDashboard(
   const konversi = totalChat > 0 ? (totalTx / totalChat) * 100 : 0;
   const cpa = totalTx > 0 ? totalSpend / totalTx : 0;
   const roas = totalSpend > 0 ? onlineOmset / totalSpend : 0;
+
+  const estimasiOmset = omset + masukOmset;
+  const estimasiProfit = profitKotor + masukProfit;
 
   return {
     omset,
@@ -299,17 +323,21 @@ export function computeDashboard(
     countOnline: onlineTx.length,
     countOffline: offlineTx.length,
     topProduk,
+    produkQtyPeriode,
     rtsList,
     rtsOmset,
     piutang,
     piutangCount,
+    piutangProfit,
     masukOmset,
+    masukProfit,
     masukCount,
     pendingOmset,
     pendingProfit,
     pendingCount: pendingTx.length,
-    estimasiOmset: omset + pendingOmset,
-    estimasiProfit: profitKotor + pendingProfit,
+    estimasiOmset,
+    estimasiProfit,
+    netProfitEstimasi: estimasiProfit - totalSpend,
     totalSpend,
     totalChat,
     cpc,
