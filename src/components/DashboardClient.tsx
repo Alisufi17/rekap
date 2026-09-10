@@ -157,7 +157,15 @@ export default function DashboardClient({
           </>
         )}
         <div className="mt-3 border-t border-border pt-3">
-          <div className="mb-1.5 text-xs font-semibold text-ink-soft">Terjual Hari Ini per Produk</div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <div className="text-xs font-semibold text-ink-soft">Terjual Hari Ini per Produk</div>
+            <div className="text-xs">
+              <b className="num">{cmp.today.totalTx}</b> paket{" "}
+              <span className="text-ink-faint">
+                (kemarin <span className="num">{cmp.yesterday.totalTx}</span>)
+              </span>
+            </div>
+          </div>
           {cmp.today.produk.length === 0 ? (
             <div className="text-xs text-ink-faint">Belum ada transaksi hari ini.</div>
           ) : (
@@ -326,7 +334,12 @@ export default function DashboardClient({
 
       {d.produkQtyPeriode.length > 0 && (
         <div className="rounded-xl border border-border bg-white p-4">
-          <div className="mb-2 text-xs font-semibold text-ink-soft">Qty Terjual per Produk</div>
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-xs font-semibold text-ink-soft">Paket & Produk Terjual</div>
+            <div className="text-sm font-bold">
+              <span className="num">{d.totalTx}</span> paket
+            </div>
+          </div>
           <div className="space-y-1">
             {d.produkQtyPeriode.map((p) => (
               <div key={p.nama} className="flex items-center justify-between text-sm">
