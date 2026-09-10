@@ -256,12 +256,12 @@ export default function DashboardClient({
           <div className="text-xs font-medium text-ink-soft">Perkiraan Omset</div>
           <div className="num mt-1 text-lg font-extrabold text-ink">{fmtIDR(d.estimasiOmset)}</div>
           <div className="mt-1.5 text-xs text-ink-faint">
-            Saldo Proses{" "}
+            Omset Proses{" "}
             <span className="num font-medium text-ink-soft">{fmtIDR(d.pendingOmset)}</span>
           </div>
         </div>
         <div className="rounded-xl bg-primary p-3.5 text-white">
-          <div className="text-xs opacity-80">Saldo Terkonfirmasi</div>
+          <div className="text-xs opacity-80">Omset Fix</div>
           <div className="num mt-1 text-lg font-extrabold">{fmtIDR(d.omset)}</div>
           <div className="mt-1.5 text-xs opacity-90">
             Profit Fix <span className="num font-medium">{fmtIDR(d.profitKotor)}</span>
