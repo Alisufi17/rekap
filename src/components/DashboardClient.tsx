@@ -309,13 +309,12 @@ export default function DashboardClient({
           </div>
         </div>
         {isAdmin && (
-          <div
-            className={`mt-3 rounded-lg p-2.5 ${
-              d.netProfitEstimasi >= 0 ? "bg-primary/10" : "bg-accent/10"
-            }`}
-          >
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-semibold text-ink-soft">Potensi Profit (net iklan)</span>
+          <div className="mt-3 rounded-lg border border-border p-2.5">
+            <div className="text-xs font-semibold text-ink-soft">
+              Potensi Profit (net iklan) · spend {fmtIDR(d.totalSpend)}
+            </div>
+            <div className="mt-1.5 flex items-center justify-between text-sm">
+              <span className="text-ink-soft">Kalau semua Masih Proses jadi Fix</span>
               <span
                 className={`num font-bold ${
                   d.netProfitEstimasi >= 0 ? "text-primary" : "text-accent"
@@ -324,9 +323,19 @@ export default function DashboardClient({
                 {fmtIDR(d.netProfitEstimasi)}
               </span>
             </div>
-            <div className="mt-0.5 text-xs text-ink-faint">
-              {d.netProfitEstimasi >= 0 ? "Untung" : "Rugi"} kalau semua yang Masih Proses cair,
-              sudah dikurangi spend iklan {fmtIDR(d.totalSpend)}
+            <div className="mt-1 flex items-center justify-between text-sm">
+              <span className="text-ink-soft">Kalau semua Masih Proses jadi RTS/gagal</span>
+              <span
+                className={`num font-bold ${
+                  d.profitKotor - d.totalSpend >= 0 ? "text-primary" : "text-accent"
+                }`}
+              >
+                {fmtIDR(d.profitKotor - d.totalSpend)}
+              </span>
+            </div>
+            <div className="mt-1.5 text-xs text-ink-faint">
+              Spend iklan tetap keluar walau order gagal — jadi rentang untung/ruginya di antara
+              dua angka ini, tergantung berapa yang benar-benar terkonfirmasi.
             </div>
           </div>
         )}
