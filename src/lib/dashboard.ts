@@ -151,16 +151,23 @@ export interface DashboardStats {
   omset: number;
   profitKotor: number;
   totalTx: number;
+  confirmedCount: number;
   onlineOmset: number;
   offlineOmset: number;
   countOnline: number;
   countOffline: number;
   topProduk: [string, { qty: number; omset: number }][];
   rtsList: VTransaction[];
+  rtsOmset: number;
   piutang: number;
+  piutangCount: number;
   pendingOmset: number;
   pendingProfit: number;
   pendingCount: number;
+  // "Masuk" = gabungan yang masih diproses (online) + piutang (offline) —
+  // dua-duanya sama-sama belum pasti jadi omset final.
+  masukOmset: number;
+  masukCount: number;
   estimasiOmset: number;
   estimasiProfit: number;
   totalSpend: number;
@@ -259,14 +266,20 @@ export function computeDashboard(
     .slice(0, 5);
 
   const rtsList = transactions.filter((t) => t.retur && inRange(t.tanggal, range));
+  const rtsOmset = rtsList.reduce((s, t) => s + t.omset, 0);
 
   const pendingTx = transactions.filter((t) => t.estimasi && inRange(t.tanggal, range));
   const pendingOmset = pendingTx.reduce((s, t) => s + t.omset, 0);
   const pendingProfit = pendingTx.reduce((s, t) => s + t.profit_kotor, 0);
 
-  const piutang = transactions
-    .filter((t) => t.piutang && inRange(t.tanggal, range))
-    .reduce((s, t) => s + t.omset, 0);
+  const piutangTx = transactions.filter((t) => t.piutang && inRange(t.tanggal, range));
+  const piutang = piutangTx.reduce((s, t) => s + t.omset, 0);
+  const piutangCount = piutangTx.length;
+
+  // "Masuk" = online masih Proses + offline Belum Lunas — dua-duanya sudah
+  // diserahkan/diproses tapi uangnya belum pasti final.
+  const masukOmset = pendingOmset + piutang;
+  const masukCount = pendingTx.length + piutangCount;
 
   const metricsInPeriod = dailyMetrics.filter((m) => inRange(m.tanggal, range));
   const totalSpend = metricsInPeriod.reduce((s, m) => s + (m.spend_iklan || 0), 0);
@@ -280,13 +293,18 @@ export function computeDashboard(
     omset,
     profitKotor,
     totalTx,
+    confirmedCount: inPeriod.length,
     onlineOmset,
     offlineOmset,
     countOnline: onlineTx.length,
     countOffline: offlineTx.length,
     topProduk,
     rtsList,
+    rtsOmset,
     piutang,
+    piutangCount,
+    masukOmset,
+    masukCount,
     pendingOmset,
     pendingProfit,
     pendingCount: pendingTx.length,

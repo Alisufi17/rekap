@@ -87,23 +87,31 @@ export default function DashboardClient({
           <div className="text-sm font-bold">Ringkasan Hari Ini</div>
           <div className="text-xs text-ink-faint">{fmtDate(cmp.today.date)} vs kemarin</div>
         </div>
+        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+          Penjualan
+        </div>
         <div className="space-y-2">
           <CompareRow
-            label="Omset"
+            label="Omset Terkonfirmasi"
             today={fmtIDR(cmp.today.omset)}
             yesterday={fmtIDR(cmp.yesterday.omset)}
             up={cmp.today.omset >= cmp.yesterday.omset}
             judged
           />
           <CompareRow
-            label="Transaksi"
+            label="Transaksi (semua status)"
             today={String(cmp.today.totalTx)}
             yesterday={String(cmp.yesterday.totalTx)}
             up={cmp.today.totalTx >= cmp.yesterday.totalTx}
             judged
           />
-          {isAdmin && (
-            <>
+        </div>
+        {isAdmin && (
+          <>
+            <div className="mb-1.5 mt-3 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+              Iklan &amp; Closing
+            </div>
+            <div className="space-y-2">
               <CompareRow
                 label="Spend Iklan"
                 today={fmtIDR(cmp.today.totalSpend)}
@@ -145,9 +153,9 @@ export default function DashboardClient({
                   <span className="num">{fmtIDR(cmp.yesterday.netProfitEstimasi)}</span>
                 </div>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
         <div className="mt-3 border-t border-border pt-3">
           <div className="mb-1.5 text-xs font-semibold text-ink-soft">Terjual Hari Ini per Produk</div>
           {cmp.today.produk.length === 0 ? (
@@ -251,30 +259,30 @@ export default function DashboardClient({
       )}
 
       <div className="text-xs text-ink-faint">{rangeLabel(preset, range)}</div>
-      <div className="grid grid-cols-2 gap-2.5">
-        <div className="rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-3.5">
-          <div className="text-xs font-medium text-ink-soft">Perkiraan Omset</div>
-          <div className="num mt-1 text-lg font-extrabold text-ink">{fmtIDR(d.estimasiOmset)}</div>
-          <div className="mt-1.5 text-xs text-ink-faint">
-            Omset Proses{" "}
-            <span className="num font-medium text-ink-soft">{fmtIDR(d.pendingOmset)}</span>
+      <div className="rounded-xl border border-border bg-white p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-xs font-semibold text-ink-soft">Estimasi Omset (kalau semua masuk cair)</div>
+          <div className="num text-base font-extrabold">{fmtIDR(d.estimasiOmset)}</div>
+        </div>
+        <div className="space-y-2">
+          <BreakdownRow
+            tone="confirmed"
+            label="Terkonfirmasi"
+            count={d.confirmedCount}
+            value={d.omset}
+          />
+          <BreakdownRow tone="pending" label="Masuk (Proses/Piutang)" count={d.masukCount} value={d.masukOmset} />
+          <BreakdownRow tone="rts" label="RTS (Retur)" count={d.rtsList.length} value={d.rtsOmset} />
+        </div>
+        <div className="mt-3 flex justify-between border-t border-border pt-2.5 text-xs">
+          <div>
+            Profit (dari yang Terkonfirmasi){" "}
+            <b className="num">{fmtIDR(d.profitKotor)}</b>
           </div>
-        </div>
-        <div className="rounded-xl bg-primary p-3.5 text-white">
-          <div className="text-xs opacity-80">Omset Fix</div>
-          <div className="num mt-1 text-lg font-extrabold">{fmtIDR(d.omset)}</div>
-          <div className="mt-1.5 text-xs opacity-90">
-            Profit Fix <span className="num font-medium">{fmtIDR(d.profitKotor)}</span>
+          <div>
+            Margin{" "}
+            <b className="num">{d.omset > 0 ? Math.round((d.profitKotor / d.omset) * 100) : 0}%</b>
           </div>
-        </div>
-      </div>
-      <div className="flex justify-between rounded-xl border border-border bg-white px-4 py-2.5 text-xs">
-        <div>
-          Transaksi <b className="num">{d.totalTx}</b>
-        </div>
-        <div>
-          Margin{" "}
-          <b className="num">{d.omset > 0 ? Math.round((d.profitKotor / d.omset) * 100) : 0}%</b>
         </div>
       </div>
 
@@ -458,6 +466,30 @@ function TargetBar({
           style={{ width: `${pct}%` }}
         />
       </div>
+    </div>
+  );
+}
+
+function BreakdownRow({
+  tone,
+  label,
+  count,
+  value,
+}: {
+  tone: "confirmed" | "pending" | "rts";
+  label: string;
+  count: number;
+  value: number;
+}) {
+  const dot = tone === "confirmed" ? "bg-primary" : tone === "rts" ? "bg-accent" : "bg-ink-faint";
+  const valueColor = tone === "rts" ? "text-accent" : "text-ink";
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="flex items-center gap-1.5 text-ink-soft">
+        <span className={`h-2 w-2 rounded-full ${dot}`} />
+        {label} <span className="text-xs text-ink-faint">({count})</span>
+      </span>
+      <span className={`num font-semibold ${valueColor}`}>{fmtIDR(value)}</span>
     </div>
   );
 }
