@@ -73,6 +73,8 @@ export interface DayStats {
   totalSpend: number;
   totalChat: number;
   konversi: number;
+  profitEstimasi: number;
+  netProfitEstimasi: number;
 }
 
 function computeDayStats(
@@ -101,7 +103,25 @@ function computeDayStats(
   const totalChat = metric?.chat_masuk ?? 0;
   const konversi = totalChat > 0 ? (dayTx.length / totalChat) * 100 : 0;
 
-  return { date, omset, totalTx: dayTx.length, produk, totalSpend, totalChat, konversi };
+  // Perkiraan profit: asumsi semua transaksi hari ini terkirim/lunas
+  // (kecuali yang sudah RTS/retur, itu pasti tidak jadi omset). Dikurangi
+  // spend iklan hari itu supaya kelihatan untung atau rugi bersih.
+  const profitEstimasi = dayTx
+    .filter((t) => !t.retur)
+    .reduce((s, t) => s + t.profit_kotor, 0);
+  const netProfitEstimasi = profitEstimasi - totalSpend;
+
+  return {
+    date,
+    omset,
+    totalTx: dayTx.length,
+    produk,
+    totalSpend,
+    totalChat,
+    konversi,
+    profitEstimasi,
+    netProfitEstimasi,
+  };
 }
 
 export interface DayComparison {

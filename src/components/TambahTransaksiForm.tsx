@@ -117,7 +117,9 @@ export default function TambahTransaksiForm({ products }: { products: Product[] 
   const ongkirNum = parseFloat(ongkir) || 0;
   const perPcs = qtyNum > 0 ? totalNum / qtyNum : 0;
   const modal = qtyNum * hppNum;
-  const profit = channel === "online" ? totalNum - modal - ongkirNum : totalNum - modal;
+  const BIAYA_PACKING = 2000;
+  const profit =
+    (channel === "online" ? totalNum - modal - ongkirNum : totalNum - modal) - BIAYA_PACKING;
 
   function onProductPick(id: string) {
     setProdukId(id);
@@ -319,6 +321,7 @@ export default function TambahTransaksiForm({ products }: { products: Product[] 
         <Row label="Omset (total deal)" value={fmtIDR(totalNum)} />
         <Row label="Modal (HPP × qty)" value={`-${fmtIDR(modal)}`} />
         {channel === "online" && <Row label="Ongkir" value={`-${fmtIDR(ongkirNum)}`} />}
+        <Row label="Biaya Packing" value={`-${fmtIDR(BIAYA_PACKING)}`} />
         <Row label="Estimasi Profit" value={fmtIDR(profit)} bold />
       </div>
 

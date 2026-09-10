@@ -124,6 +124,27 @@ export default function DashboardClient({
                 up={cmp.today.konversi >= cmp.yesterday.konversi}
                 judged
               />
+              <div
+                className={`rounded-lg p-2.5 ${
+                  cmp.today.netProfitEstimasi >= 0 ? "bg-primary/10" : "bg-accent/10"
+                }`}
+              >
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold text-ink-soft">Perkiraan Profit (net iklan)</span>
+                  <span
+                    className={`num font-bold ${
+                      cmp.today.netProfitEstimasi >= 0 ? "text-primary" : "text-accent"
+                    }`}
+                  >
+                    {fmtIDR(cmp.today.netProfitEstimasi)}
+                  </span>
+                </div>
+                <div className="mt-0.5 text-xs text-ink-faint">
+                  {cmp.today.netProfitEstimasi >= 0 ? "Untung" : "Rugi"} kalau semua transaksi hari
+                  ini terkirim/lunas, sudah dikurangi spend iklan · kemarin{" "}
+                  <span className="num">{fmtIDR(cmp.yesterday.netProfitEstimasi)}</span>
+                </div>
+              </div>
             </>
           )}
         </div>
