@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   computeDashboard,
-  computeDayComparison,
   rangeForPreset,
   rangeLabel,
   type PresetKey,
@@ -12,7 +11,7 @@ import {
 } from "@/lib/dashboard";
 import { fmtIDR, fmtDate, todayStr } from "@/lib/format";
 import TrendChart from "@/components/TrendChart";
-import type { VTransaction, DailyMetric, VMonthlyPnl, Product } from "@/types/database";
+import type { VTransaction, DailyMetric, VMonthlyPnl, Product, OperatingExpense } from "@/types/database";
 
 const PRESETS: [PresetKey, string][] = [
   ["hari_ini", "Hari ini"],
@@ -26,6 +25,7 @@ const PRESETS: [PresetKey, string][] = [
 export default function DashboardClient({
   transactions,
   dailyMetrics,
+  expenses,
   monthlyPnl,
   isAdmin,
   lowStockProducts,
@@ -34,6 +34,7 @@ export default function DashboardClient({
 }: {
   transactions: VTransaction[];
   dailyMetrics: DailyMetric[];
+  expenses: OperatingExpense[];
   monthlyPnl: VMonthlyPnl | null;
   isAdmin: boolean;
   lowStockProducts: Product[];
@@ -52,8 +53,7 @@ export default function DashboardClient({
   const [draftTo, setDraftTo] = useState(customRange.to);
 
   const range = preset === "custom" ? customRange : rangeForPreset(preset);
-  const d = computeDashboard(transactions, dailyMetrics, range);
-  const cmp = computeDayComparison(transactions, dailyMetrics);
+  const d = computeDashboard(transactions, dailyMetrics, range, expenses);
 
   function applyPreset(p: PresetKey) {
     setPreset(p);
@@ -81,113 +81,6 @@ export default function DashboardClient({
           </div>
         </div>
       )}
-
-      <div className="rounded-xl border-2 border-primary/20 bg-white p-4">
-        <div className="mb-2.5 flex items-center justify-between">
-          <div className="text-sm font-bold">Ringkasan Hari Ini</div>
-          <div className="text-xs text-ink-faint">{fmtDate(cmp.today.date)} vs kemarin</div>
-        </div>
-        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-soft">
-          Penjualan
-        </div>
-        <div className="space-y-2">
-          <CompareRow
-            label="Omset Terkonfirmasi"
-            today={fmtIDR(cmp.today.omset)}
-            yesterday={fmtIDR(cmp.yesterday.omset)}
-            up={cmp.today.omset >= cmp.yesterday.omset}
-            judged
-          />
-          <CompareRow
-            label="Transaksi (semua status)"
-            today={String(cmp.today.totalTx)}
-            yesterday={String(cmp.yesterday.totalTx)}
-            up={cmp.today.totalTx >= cmp.yesterday.totalTx}
-            judged
-          />
-        </div>
-        {isAdmin && (
-          <>
-            <div className="mb-1.5 mt-3 text-xs font-semibold uppercase tracking-wide text-ink-soft">
-              Iklan &amp; Closing
-            </div>
-            <div className="space-y-2">
-              <CompareRow
-                label="Spend Iklan"
-                today={fmtIDR(cmp.today.totalSpend)}
-                yesterday={fmtIDR(cmp.yesterday.totalSpend)}
-                up={cmp.today.totalSpend >= cmp.yesterday.totalSpend}
-              />
-              <CompareRow
-                label="Chat Masuk"
-                today={String(cmp.today.totalChat)}
-                yesterday={String(cmp.yesterday.totalChat)}
-                up={cmp.today.totalChat >= cmp.yesterday.totalChat}
-                judged
-              />
-              <CompareRow
-                label="Closing (transaksi/chat)"
-                today={`${cmp.today.konversi.toFixed(1)}%`}
-                yesterday={`${cmp.yesterday.konversi.toFixed(1)}%`}
-                up={cmp.today.konversi >= cmp.yesterday.konversi}
-                judged
-              />
-              <div
-                className={`rounded-lg p-2.5 ${
-                  cmp.today.netProfitEstimasi >= 0 ? "bg-primary/10" : "bg-accent/10"
-                }`}
-              >
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-semibold text-ink-soft">Perkiraan Profit (net iklan)</span>
-                  <span
-                    className={`num font-bold ${
-                      cmp.today.netProfitEstimasi >= 0 ? "text-primary" : "text-accent"
-                    }`}
-                  >
-                    {fmtIDR(cmp.today.netProfitEstimasi)}
-                  </span>
-                </div>
-                <div className="mt-0.5 text-xs text-ink-faint">
-                  {cmp.today.netProfitEstimasi >= 0 ? "Untung" : "Rugi"} kalau semua transaksi hari
-                  ini terkirim/lunas, sudah dikurangi spend iklan · kemarin{" "}
-                  <span className="num">{fmtIDR(cmp.yesterday.netProfitEstimasi)}</span>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-        <div className="mt-3 border-t border-border pt-3">
-          <div className="mb-1.5 flex items-center justify-between">
-            <div className="text-xs font-semibold text-ink-soft">Terjual Hari Ini per Produk</div>
-            <div className="text-xs">
-              <b className="num">{cmp.today.totalTx}</b> paket{" "}
-              <span className="text-ink-faint">
-                (kemarin <span className="num">{cmp.yesterday.totalTx}</span>)
-              </span>
-            </div>
-          </div>
-          {cmp.today.produk.length === 0 ? (
-            <div className="text-xs text-ink-faint">Belum ada transaksi hari ini.</div>
-          ) : (
-            <div className="space-y-1">
-              {cmp.today.produk.map((p) => {
-                const qtyKemarin = cmp.yesterday.produk.find((x) => x.nama === p.nama)?.qty ?? 0;
-                return (
-                  <div key={p.nama} className="flex items-center justify-between text-sm">
-                    <span>{p.nama}</span>
-                    <span className="num font-medium">
-                      {p.qty} pcs{" "}
-                      <span className="text-xs font-normal text-ink-faint">
-                        (kemarin {qtyKemarin})
-                      </span>
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
 
       {isAdmin && monthlyPnl && (monthlyPnl.target_omset || monthlyPnl.target_profit) ? (
         <div className="rounded-xl border border-border bg-white p-4">
@@ -298,6 +191,14 @@ export default function DashboardClient({
             value={d.profitKotor}
           />
           <BreakdownRow tone="pending" label="Profit Masih Proses" count={d.masukCount} value={d.masukProfit} />
+          {d.rtsList.length > 0 && (
+            <BreakdownRow
+              tone="rts"
+              label="Kerugian RTS (modal+ongkir+packing hangus)"
+              count={d.rtsList.length}
+              value={-d.rtsLoss}
+            />
+          )}
         </div>
         <div className="mt-3 flex justify-between border-t border-border pt-2.5 text-xs">
           <div>
@@ -309,37 +210,103 @@ export default function DashboardClient({
           </div>
         </div>
         {isAdmin && (
-          <div className="mt-3 rounded-lg border border-border p-2.5">
-            <div className="text-xs font-semibold text-ink-soft">
-              Potensi Profit (net iklan) · spend {fmtIDR(d.totalSpend)}
-            </div>
-            <div className="mt-1.5 flex items-center justify-between text-sm">
-              <span className="text-ink-soft">Kalau semua Masih Proses jadi Fix</span>
+          <div className="mt-3 rounded-lg bg-surface p-2.5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-semibold text-ink-soft">Profit Bersih (sudah pasti)</span>
               <span
                 className={`num font-bold ${
-                  d.netProfitEstimasi >= 0 ? "text-primary" : "text-accent"
+                  d.profitBersih >= 0 ? "text-primary" : "text-accent"
                 }`}
               >
-                {fmtIDR(d.netProfitEstimasi)}
+                {fmtIDR(d.profitBersih)}
               </span>
             </div>
-            <div className="mt-1 flex items-center justify-between text-sm">
-              <span className="text-ink-soft">Kalau semua Masih Proses jadi RTS/gagal</span>
-              <span
-                className={`num font-bold ${
-                  d.profitKotor - d.totalSpend >= 0 ? "text-primary" : "text-accent"
-                }`}
-              >
-                {fmtIDR(d.profitKotor - d.totalSpend)}
-              </span>
+            <div className="mt-0.5 text-xs text-ink-faint">
+              Terkonfirmasi ({fmtIDR(d.profitKotor)}) − Kerugian RTS ({fmtIDR(d.rtsLoss)}) − Spend
+              Iklan ({fmtIDR(d.totalSpend)})
             </div>
-            <div className="mt-1.5 text-xs text-ink-faint">
-              Spend iklan tetap keluar walau order gagal — jadi rentang untung/ruginya di antara
-              dua angka ini, tergantung berapa yang benar-benar terkonfirmasi.
-            </div>
+            {d.masukCount > 0 && (
+              <div className="mt-2.5 space-y-1.5 border-t border-border pt-2.5">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-ink-soft">+ Kalau semua Masih Proses jadi Fix</span>
+                  <span className="num font-bold text-primary">{fmtIDR(d.bestCaseProfit)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-ink-soft">− Kalau semua Masih Proses jadi RTS/gagal</span>
+                  <span
+                    className={`num font-bold ${
+                      d.worstCaseProfit >= 0 ? "text-primary" : "text-accent"
+                    }`}
+                  >
+                    {fmtIDR(d.worstCaseProfit)}
+                  </span>
+                </div>
+                <div className="text-xs text-ink-faint">
+                  Rentang untung/rugi tergantung berapa yang Masih Proses benar-benar terkonfirmasi
+                  nanti.
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {isAdmin && (
+        <div className="rounded-xl border-2 border-primary/30 bg-white p-4">
+          <div className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+            Hasil Final (bukan perkiraan)
+          </div>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-ink-soft">Total Dapat (Omset Terkonfirmasi)</span>
+              <span className="num font-bold text-primary">{fmtIDR(d.omset)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-ink-soft">Total Pengeluaran</span>
+              <span className="num font-bold text-accent">−{fmtIDR(d.totalPengeluaran)}</span>
+            </div>
+          </div>
+
+          <div className="mt-2.5 space-y-1.5 rounded-lg bg-surface p-3 text-xs text-ink-soft">
+            <div className="flex items-center justify-between">
+              <span>Modal, Ongkir &amp; Admin (penjualan terkonfirmasi)</span>
+              <span className="num">{fmtIDR(d.omset - d.profitKotor)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Kerugian RTS</span>
+              <span className="num">{fmtIDR(d.rtsLoss)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Spend Iklan</span>
+              <span className="num">{fmtIDR(d.totalSpend)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Biaya Operasional (kardus, lakban, gaji, dll)</span>
+              <span className="num">{fmtIDR(d.biayaOperasional)}</span>
+            </div>
+            <div className="mt-1 border-t border-border pt-1.5 text-ink-faint">
+              <div className="flex items-center justify-between">
+                <span>↳ termasuk Upah Hansen packing ({d.totalTx} paket × Rp2.000)</span>
+                <span className="num">{fmtIDR(d.hansenWages)}</span>
+              </div>
+              <div className="mt-0.5">
+                Sudah masuk di baris Modal/Ongkir &amp; Kerugian RTS di atas — bukan tambahan.
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
+            <span className="text-sm font-bold">Hasil Final</span>
+            <span
+              className={`num text-lg font-extrabold ${
+                d.hasilFinal >= 0 ? "text-primary" : "text-accent"
+              }`}
+            >
+              {fmtIDR(d.hasilFinal)}
+            </span>
+          </div>
+        </div>
+      )}
 
       {d.produkQtyPeriode.length > 0 && (
         <div className="rounded-xl border border-border bg-white p-4">
@@ -564,36 +531,6 @@ function BreakdownRow({
         {label} <span className="text-xs text-ink-faint">({count})</span>
       </span>
       <span className={`num font-semibold ${valueColor}`}>{fmtIDR(value)}</span>
-    </div>
-  );
-}
-
-function CompareRow({
-  label,
-  today,
-  yesterday,
-  up,
-  judged,
-}: {
-  label: string;
-  today: string;
-  yesterday: string;
-  up: boolean;
-  /** Kalau true, panah diwarnai hijau/merah (naik = bagus). Kalau false
-   * (mis. Spend Iklan), panah cuma penanda arah netral — naik tidak
-   * otomatis berarti buruk. */
-  judged?: boolean;
-}) {
-  const arrow = up ? "▲" : "▼";
-  const arrowColor = !judged ? "text-ink-faint" : up ? "text-primary" : "text-accent";
-  return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-ink-soft">{label}</span>
-      <span className="flex items-baseline gap-1.5">
-        <span className="num font-semibold">{today}</span>
-        <span className={`text-xs ${arrowColor}`}>{arrow}</span>
-        <span className="num text-xs text-ink-faint">kmrn {yesterday}</span>
-      </span>
     </div>
   );
 }

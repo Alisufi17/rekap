@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile, isAdmin } from "@/lib/auth";
 import { localDateStr } from "@/lib/format";
 import DashboardClient from "@/components/DashboardClient";
-import type { VTransaction, DailyMetric, VMonthlyPnl, Product } from "@/types/database";
+import type { VTransaction, DailyMetric, VMonthlyPnl, Product, OperatingExpense } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +27,7 @@ export default async function DashboardPage({
   monthStart.setDate(1);
   const monthStartStr = localDateStr(monthStart);
 
-  const [txRes, metricsRes, productsRes, pnlRes] = await Promise.all([
+  const [txRes, metricsRes, productsRes, pnlRes, expensesRes] = await Promise.all([
     supabase
       .from("v_transactions")
       .select("*")
@@ -36,18 +36,23 @@ export default async function DashboardPage({
     supabase.from("daily_metrics").select("*").gte("tanggal", windowStartStr),
     supabase.from("products").select("*").order("nama"),
     supabase.from("v_monthly_pnl").select("*").eq("bulan", monthStartStr).maybeSingle(),
+    // Cuma admin yang lolos RLS-nya (lihat 0003_expenses_and_targets.sql) —
+    // untuk staff otomatis kosong, bukan error.
+    supabase.from("operating_expenses").select("*").gte("tanggal", windowStartStr),
   ]);
 
   const transactions = (txRes.data ?? []) as VTransaction[];
   const dailyMetrics = (metricsRes.data ?? []) as DailyMetric[];
   const products = (productsRes.data ?? []) as Product[];
   const monthlyPnl = (pnlRes.data ?? null) as VMonthlyPnl | null;
+  const expenses = (expensesRes.data ?? []) as OperatingExpense[];
   const lowStockProducts = products.filter((p) => (p.stok ?? 0) <= 3);
 
   return (
     <DashboardClient
       transactions={transactions}
       dailyMetrics={dailyMetrics}
+      expenses={expenses}
       monthlyPnl={monthlyPnl}
       isAdmin={admin}
       lowStockProducts={lowStockProducts}

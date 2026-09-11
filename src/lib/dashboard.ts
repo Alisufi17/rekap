@@ -1,5 +1,5 @@
 import { localDateStr } from "@/lib/format";
-import type { VTransaction, DailyMetric } from "@/types/database";
+import type { VTransaction, DailyMetric, OperatingExpense } from "@/types/database";
 
 export type DateRange = { from: string; to: string };
 
@@ -65,88 +65,6 @@ export function rangeLabel(preset: PresetKey, range: DateRange): string {
   return range.from === range.to ? range.from : `${range.from} s/d ${range.to}`;
 }
 
-export interface DayStats {
-  date: string;
-  omset: number;
-  totalTx: number;
-  produk: { nama: string; qty: number }[];
-  totalSpend: number;
-  totalChat: number;
-  konversi: number;
-  profitEstimasi: number;
-  netProfitEstimasi: number;
-}
-
-function computeDayStats(
-  transactions: VTransaction[],
-  dailyMetrics: DailyMetric[],
-  date: string
-): DayStats {
-  const dayTx = transactions.filter((t) => t.tanggal === date);
-  const confirmedTx = dayTx.filter((t) => t.terkonfirmasi);
-  const omset = confirmedTx.reduce((s, t) => s + t.omset, 0);
-
-  // Qty per produk dihitung dari SEMUA transaksi hari itu (bukan cuma yang
-  // sudah terkonfirmasi) — ini pertanyaan operasional ("berapa paket
-  // dikirim hari ini"), bukan pertanyaan keuangan, jadi tetap dihitung
-  // walau status masih Proses/Belum Lunas.
-  const prodMap: Record<string, number> = {};
-  dayTx.forEach((t) => {
-    prodMap[t.produk_nama] = (prodMap[t.produk_nama] ?? 0) + t.qty;
-  });
-  const produk = Object.entries(prodMap)
-    .map(([nama, qty]) => ({ nama, qty }))
-    .sort((a, b) => b.qty - a.qty);
-
-  const metric = dailyMetrics.find((m) => m.tanggal === date);
-  const totalSpend = metric?.spend_iklan ?? 0;
-  const totalChat = metric?.chat_masuk ?? 0;
-  const konversi = totalChat > 0 ? (dayTx.length / totalChat) * 100 : 0;
-
-  // Perkiraan profit: asumsi semua transaksi hari ini terkirim/lunas
-  // (kecuali yang sudah RTS/retur, itu pasti tidak jadi omset). Dikurangi
-  // spend iklan hari itu supaya kelihatan untung atau rugi bersih.
-  const profitEstimasi = dayTx
-    .filter((t) => !t.retur)
-    .reduce((s, t) => s + t.profit_kotor, 0);
-  const netProfitEstimasi = profitEstimasi - totalSpend;
-
-  return {
-    date,
-    omset,
-    totalTx: dayTx.length,
-    produk,
-    totalSpend,
-    totalChat,
-    konversi,
-    profitEstimasi,
-    netProfitEstimasi,
-  };
-}
-
-export interface DayComparison {
-  today: DayStats;
-  yesterday: DayStats;
-}
-
-// Perbandingan hari-ini-vs-kemarin yang selalu tampil di atas dashboard,
-// lepas dari preset periode yang dipilih user di bawahnya — supaya evaluasi
-// harian tidak perlu klak-klik pilih periode dulu.
-export function computeDayComparison(
-  transactions: VTransaction[],
-  dailyMetrics: DailyMetric[]
-): DayComparison {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  return {
-    today: computeDayStats(transactions, dailyMetrics, localDateStr(today)),
-    yesterday: computeDayStats(transactions, dailyMetrics, localDateStr(yesterday)),
-  };
-}
-
 export interface DashboardStats {
   omset: number;
   profitKotor: number;
@@ -160,6 +78,10 @@ export interface DashboardStats {
   produkQtyPeriode: { nama: string; qty: number }[];
   rtsList: VTransaction[];
   rtsOmset: number;
+  // Modal + ongkir + admin + packing yang sudah hangus karena RTS (barang
+  // rusak/mati di jalan, ongkir & packing tidak balik) — kerugian nyata,
+  // bukan cuma "0" karena dianggap tidak jadi omset.
+  rtsLoss: number;
   piutang: number;
   piutangCount: number;
   piutangProfit: number;
@@ -171,12 +93,21 @@ export interface DashboardStats {
   masukOmset: number;
   masukProfit: number;
   masukCount: number;
+  // Modal + ongkir + admin + packing yang akan hangus KALAU semua yang
+  // Masuk ternyata gagal/RTS juga — dasar skenario terburuk.
+  masukCost: number;
   estimasiOmset: number;
   estimasiProfit: number;
-  // Potensi profit kalau semua yang Masuk berhasil cair, dikurangi spend
-  // iklan periode ini — supaya kelihatan untung/rugi bersih, bukan cuma
-  // profit kotor penjualan.
-  netProfitEstimasi: number;
+  // Profit bersih yang sudah PASTI sejauh ini: profit dari yang
+  // terkonfirmasi, dikurangi kerugian RTS yang sudah terjadi, dikurangi
+  // spend iklan periode ini. Ini jawaban "total untungnya berapa" kalau
+  // semua transaksi periode ini sudah tidak ada yang Masih Proses.
+  profitBersih: number;
+  // Rentang skenario untuk yang masih Masih Proses: kalau semua jadi Fix
+  // (best case) vs kalau semua jadi RTS/gagal (worst case) — dua-duanya
+  // sudah dikurangi kerugian RTS yang sudah terjadi + spend iklan.
+  bestCaseProfit: number;
+  worstCaseProfit: number;
   totalSpend: number;
   totalChat: number;
   cpc: number;
@@ -184,6 +115,20 @@ export interface DashboardStats {
   cpa: number;
   roas: number;
   buckets: { label: string; value: number }[];
+  // Upah packing Hansen periode ini — SEMUA transaksi apapun statusnya
+  // (packing terjadi begitu paket disiapkan). Sudah ikut terpotong di
+  // profitKotor/rtsLoss/masukCost masing-masing; angka ini murni supaya
+  // kelihatan, bukan potongan baru.
+  hansenWages: number;
+  // Belanja operasional (kardus, lakban, gaji, dll — dicatat di halaman
+  // Keuangan) untuk tanggal di dalam periode ini.
+  biayaOperasional: number;
+  // Hasil akhir: uang yang benar-benar sudah masuk (Omset Terkonfirmasi)
+  // dikurangi SEMUA pengeluaran nyata sejauh ini — modal & ongkir jualan,
+  // kerugian RTS, spend iklan, dan belanja operasional. Ini jawaban pasti
+  // "total dapat berapa, total pengeluaran berapa" — bukan perkiraan.
+  totalPengeluaran: number;
+  hasilFinal: number;
 }
 
 function daysBetween(range: DateRange): number {
@@ -249,7 +194,8 @@ function buildBuckets(transactions: VTransaction[], range: DateRange): { label: 
 export function computeDashboard(
   transactions: VTransaction[],
   dailyMetrics: DailyMetric[],
-  range: DateRange
+  range: DateRange,
+  expenses: OperatingExpense[] = []
 ): DashboardStats {
   const inPeriod = transactions.filter((t) => inRange(t.tanggal, range) && t.terkonfirmasi);
 
@@ -286,6 +232,10 @@ export function computeDashboard(
 
   const rtsList = transactions.filter((t) => t.retur && inRange(t.tanggal, range));
   const rtsOmset = rtsList.reduce((s, t) => s + t.omset, 0);
+  // t.profit_kotor dihitung seolah-olah laku (omset - modal - ongkir -
+  // admin - packing); untuk RTS omsetnya tidak pernah cair, jadi biaya yang
+  // sudah dikeluarkan (modal+ongkir+admin+packing) = omset - profit_kotor.
+  const rtsLoss = rtsList.reduce((s, t) => s + (t.omset - t.profit_kotor), 0);
 
   const pendingTx = transactions.filter((t) => t.estimasi && inRange(t.tanggal, range));
   const pendingOmset = pendingTx.reduce((s, t) => s + t.omset, 0);
@@ -301,6 +251,7 @@ export function computeDashboard(
   const masukOmset = pendingOmset + piutang;
   const masukProfit = pendingProfit + piutangProfit;
   const masukCount = pendingTx.length + piutangCount;
+  const masukCost = masukOmset - masukProfit;
 
   const metricsInPeriod = dailyMetrics.filter((m) => inRange(m.tanggal, range));
   const totalSpend = metricsInPeriod.reduce((s, m) => s + (m.spend_iklan || 0), 0);
@@ -312,6 +263,27 @@ export function computeDashboard(
 
   const estimasiOmset = omset + masukOmset;
   const estimasiProfit = profitKotor + masukProfit;
+
+  // Profit bersih yang sudah pasti: confirmed profit dikurangi kerugian RTS
+  // yang sudah terjadi dan spend iklan periode ini. Kalau tidak ada lagi
+  // yang Masih Proses, ini JAWABAN FINAL "untungnya berapa".
+  const profitBersih = profitKotor - rtsLoss - totalSpend;
+  // Best case: semua yang Masih Proses berhasil cair.
+  const bestCaseProfit = profitBersih + masukProfit;
+  // Worst case: semua yang Masih Proses ternyata RTS/gagal juga — modal,
+  // ongkir, admin, dan packingnya ikut hangus (bukan cuma "tidak dapat").
+  const worstCaseProfit = profitBersih - masukCost;
+
+  const hansenWages = totalTx * 2000;
+  const biayaOperasional = expenses
+    .filter((e) => inRange(e.tanggal, range))
+    .reduce((s, e) => s + e.nominal, 0);
+
+  // Modal+ongkir+admin+packing dari yang terkonfirmasi (omset - profitKotor)
+  // + kerugian RTS + spend iklan + belanja operasional = semua uang yang
+  // sudah benar-benar keluar sejauh ini.
+  const totalPengeluaran = omset - profitKotor + rtsLoss + totalSpend + biayaOperasional;
+  const hasilFinal = omset - totalPengeluaran;
 
   return {
     omset,
@@ -326,18 +298,22 @@ export function computeDashboard(
     produkQtyPeriode,
     rtsList,
     rtsOmset,
+    rtsLoss,
     piutang,
     piutangCount,
     piutangProfit,
     masukOmset,
     masukProfit,
     masukCount,
+    masukCost,
     pendingOmset,
     pendingProfit,
     pendingCount: pendingTx.length,
     estimasiOmset,
     estimasiProfit,
-    netProfitEstimasi: estimasiProfit - totalSpend,
+    profitBersih,
+    bestCaseProfit,
+    worstCaseProfit,
     totalSpend,
     totalChat,
     cpc,
@@ -345,5 +321,9 @@ export function computeDashboard(
     cpa,
     roas,
     buckets: buildBuckets(transactions, range),
+    hansenWages,
+    biayaOperasional,
+    totalPengeluaran,
+    hasilFinal,
   };
 }
