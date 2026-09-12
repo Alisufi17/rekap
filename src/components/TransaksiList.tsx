@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { updateTransactionStatus, deleteTransaction } from "@/lib/transactions";
+import { updateTransactionStatus, deleteTransaction, setDikemas } from "@/lib/transactions";
 import { fmtIDR, fmtDate, waLink, todayStr } from "@/lib/format";
-import { rangeForPreset, type PresetKey } from "@/lib/dashboard";
+import { rangeForPreset, RTS_RISK_DAYS, type PresetKey } from "@/lib/dashboard";
 import type { VTransaction } from "@/types/database";
 
 const FILTERS: [string, string][] = [
@@ -11,9 +11,18 @@ const FILTERS: [string, string][] = [
   ["online", "Online"],
   ["offline", "Offline"],
   ["proses", "Proses"],
+  ["belum_dikemas", "Belum Dikemas"],
+  ["rts_risk", "Potensi RTS"],
   ["belum", "Belum Lunas"],
   ["rts", "RTS"],
 ];
+
+function hariLalu(tanggal: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tgl = new Date(tanggal + "T00:00:00");
+  return Math.floor((today.getTime() - tgl.getTime()) / 86_400_000);
+}
 
 const DATE_PRESETS: [PresetKey | "semua", string][] = [
   ["hari_ini", "Hari ini"],
@@ -55,6 +64,10 @@ export default function TransaksiList({
     if (filter === "proses") return t.status === "proses";
     if (filter === "belum") return t.status === "belum";
     if (filter === "rts") return t.status === "rts";
+    if (filter === "belum_dikemas")
+      return t.channel === "online" && t.status === "proses" && !t.dikemas;
+    if (filter === "rts_risk")
+      return t.channel === "online" && t.status === "proses" && hariLalu(t.tanggal) >= RTS_RISK_DAYS;
     return true;
   });
 
@@ -167,6 +180,7 @@ function DateGroup({
 
 function TxCard({ t, isAdmin }: { t: VTransaction; isAdmin: boolean }) {
   const [busy, setBusy] = useState(false);
+  const [dikemasBusy, setDikemasBusy] = useState(false);
   const statusLabel =
     t.channel === "online"
       ? t.status === "proses"
@@ -178,10 +192,21 @@ function TxCard({ t, isAdmin }: { t: VTransaction; isAdmin: boolean }) {
         ? "Lunas"
         : "Belum Lunas";
 
+  const isOpenOnline = t.channel === "online" && t.status === "proses";
+  const umur = isOpenOnline ? hariLalu(t.tanggal) : 0;
+  const isRtsRisk = isOpenOnline && umur >= RTS_RISK_DAYS;
+  const isBelumDikemas = isOpenOnline && !t.dikemas;
+
   async function handleStatusChange(newStatus: string) {
     setBusy(true);
     await updateTransactionStatus(t.id, newStatus);
     setBusy(false);
+  }
+
+  async function handleToggleDikemas() {
+    setDikemasBusy(true);
+    await setDikemas(t.id, !t.dikemas);
+    setDikemasBusy(false);
   }
 
   async function handleDelete() {
@@ -194,7 +219,11 @@ function TxCard({ t, isAdmin }: { t: VTransaction; isAdmin: boolean }) {
   const wa = waLink(t.customer_phone);
 
   return (
-    <div className="rounded-xl border border-border bg-white p-3.5">
+    <div
+      className={`rounded-xl border bg-white p-3.5 ${
+        isRtsRisk ? "border-accent/40" : isBelumDikemas ? "border-offline/40" : "border-border"
+      }`}
+    >
       <div className="flex items-start justify-between">
         <div>
           <div className="text-sm font-bold">{t.produk_nama}</div>
@@ -209,11 +238,32 @@ function TxCard({ t, isAdmin }: { t: VTransaction; isAdmin: boolean }) {
           {t.channel === "online" ? "Online" : "Offline"}
         </Badge>
         <Badge tone={t.status === "rts" ? "danger" : "neutral"}>{statusLabel}</Badge>
+        {isRtsRisk && (
+          <Badge tone="danger">⚠ {umur} hari lalu · potensi RTS</Badge>
+        )}
         {!t.affects_stock && <Badge tone="neutral">Data historis</Badge>}
         <Badge tone="neutral">Profit {fmtIDR(t.profit_kotor)}</Badge>
       </div>
       {t.catatan && <div className="mt-2 text-xs italic text-ink-soft">&quot;{t.catatan}&quot;</div>}
       {t.created_by && <div className="text-xs text-ink-faint">dicatat oleh {t.created_by}</div>}
+
+      {isOpenOnline && (
+        <button
+          disabled={dikemasBusy}
+          onClick={handleToggleDikemas}
+          className={`mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold ${
+            t.dikemas
+              ? "bg-surface text-ink-soft"
+              : "bg-offline/15 text-offline"
+          }`}
+        >
+          {t.dikemas ? "✓ Sudah Dikemas & Dikirim" : "📦 Tandai Sudah Dikemas & Dikirim"}
+        </button>
+      )}
+      {!isOpenOnline && t.channel === "online" && !t.dikemas && (
+        <div className="mt-2 text-xs text-ink-faint">Belum pernah ditandai dikemas</div>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <select
           disabled={busy}

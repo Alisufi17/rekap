@@ -1,5 +1,11 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { computeDashboard, rangeForPreset, rangeLabel, type DateRange } from "./dashboard";
+import {
+  computeDashboard,
+  computeAlerts,
+  rangeForPreset,
+  rangeLabel,
+  type DateRange,
+} from "./dashboard";
 import type {
   VTransaction,
   DailyMetric,
@@ -29,6 +35,7 @@ function makeTx(input: {
   ongkir?: number;
   admin?: number;
   produk_nama?: string;
+  dikemas?: boolean;
 }): VTransaction {
   seq += 1;
   const qty = input.qty ?? 1;
@@ -36,6 +43,9 @@ function makeTx(input: {
   const hpp = input.hpp ?? 40_000;
   const ongkir = input.ongkir ?? 0;
   const admin = input.admin ?? 0;
+  // Default true (sudah dikemas) supaya fixture existing tidak diam-diam
+  // ketangkep alert "belum dikemas" kecuali test memang mau menguji itu.
+  const dikemas = input.dikemas ?? true;
 
   const omset = qty * harga;
   const modal = qty * hpp;
@@ -66,6 +76,7 @@ function makeTx(input: {
     created_by: null,
     created_by_uid: null,
     affects_stock: true,
+    dikemas,
     created_at: `${input.tanggal}T00:00:00Z`,
     omset,
     modal,
@@ -336,5 +347,83 @@ describe("rangeForPreset & rangeLabel", () => {
     expect(rangeLabel("custom", { from: "2026-09-01", to: "2026-09-05" })).toBe(
       "2026-09-01 s/d 2026-09-05"
     );
+  });
+});
+
+describe("computeAlerts", () => {
+  const TODAY = new Date("2026-09-15T09:00:00");
+
+  it("menandai online+Proses+belum dikemas sebagai belumDikemas", () => {
+    const belum = makeTx({
+      channel: "online",
+      status: "proses",
+      tanggal: "2026-09-14",
+      dikemas: false,
+    });
+    const sudah = makeTx({
+      channel: "online",
+      status: "proses",
+      tanggal: "2026-09-14",
+      dikemas: true,
+    });
+    const offlineBelum = makeTx({
+      channel: "offline",
+      status: "belum",
+      tanggal: "2026-09-14",
+      dikemas: false,
+    });
+
+    const alerts = computeAlerts([belum, sudah, offlineBelum], TODAY);
+
+    expect(alerts.belumDikemas).toEqual([belum]);
+  });
+
+  it("tidak menandai yang sudah Selesai/RTS meski belum pernah ditandai dikemas", () => {
+    const selesai = makeTx({
+      channel: "online",
+      status: "selesai",
+      tanggal: "2026-09-14",
+      dikemas: false,
+    });
+
+    const alerts = computeAlerts([selesai], TODAY);
+
+    expect(alerts.belumDikemas).toHaveLength(0);
+  });
+
+  it("potensiRts menandai online+Proses yang sudah >= threshold hari, bukan yang masih baru", () => {
+    const lama = makeTx({
+      channel: "online",
+      status: "proses",
+      tanggal: "2026-09-11", // 4 hari sebelum TODAY (15 Sep)
+    });
+    const pasBatas = makeTx({
+      channel: "online",
+      status: "proses",
+      tanggal: "2026-09-11",
+    });
+    const baru = makeTx({
+      channel: "online",
+      status: "proses",
+      tanggal: "2026-09-13", // 2 hari, belum berisiko
+    });
+    const selesaiLama = makeTx({
+      channel: "online",
+      status: "selesai",
+      tanggal: "2026-09-01", // lama tapi sudah selesai, bukan risiko
+    });
+
+    const alerts = computeAlerts([lama, pasBatas, baru, selesaiLama], TODAY, 4);
+
+    expect(alerts.potensiRts).toEqual([lama, pasBatas]);
+  });
+
+  it("tetap menandai pesanan yang sudah jauh lebih dari threshold (bukan cuma tepat di angka batas)", () => {
+    const seminggu = makeTx({ channel: "online", status: "proses", tanggal: "2026-09-08" }); // 7 hari
+    const sebulan = makeTx({ channel: "online", status: "proses", tanggal: "2026-08-10" }); // 36 hari
+
+    const alerts = computeAlerts([seminggu, sebulan], TODAY, 4);
+
+    expect(alerts.potensiRts).toEqual([seminggu, sebulan]);
   });
 });

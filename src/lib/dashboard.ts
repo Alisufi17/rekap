@@ -327,3 +327,40 @@ export function computeDashboard(
     hasilFinal,
   };
 }
+
+// Jumlah hari sejak diinput sebelum pesanan Proses dianggap berisiko RTS
+// (kelamaan di jalan / kelupaan) dan perlu dicek manual.
+export const RTS_RISK_DAYS = 4;
+
+export interface DashboardAlerts {
+  // Online, masih Proses, belum ditandai dikemas — risiko kejadian nyata:
+  // sistem bilang "Proses" tapi fisiknya belum pernah dikemas/dikirim.
+  belumDikemas: VTransaction[];
+  // Online, masih Proses, sudah RTS_RISK_DAYS+ hari sejak tanggal transaksi
+  // — kemungkinan hilang/lupa ditindaklanjuti, berpotensi jadi RTS.
+  potensiRts: VTransaction[];
+}
+
+// `today` dibuat jadi parameter (bukan langsung `new Date()`) supaya
+// gampang ditest dengan tanggal tetap.
+export function computeAlerts(
+  transactions: VTransaction[],
+  today: Date = new Date(),
+  thresholdDays: number = RTS_RISK_DAYS
+): DashboardAlerts {
+  const todayMid = new Date(today);
+  todayMid.setHours(0, 0, 0, 0);
+
+  const belumDikemas = transactions.filter(
+    (t) => t.channel === "online" && t.status === "proses" && !t.dikemas
+  );
+
+  const potensiRts = transactions.filter((t) => {
+    if (t.channel !== "online" || t.status !== "proses") return false;
+    const txDate = new Date(t.tanggal + "T00:00:00");
+    const daysSince = Math.floor((todayMid.getTime() - txDate.getTime()) / 86_400_000);
+    return daysSince >= thresholdDays;
+  });
+
+  return { belumDikemas, potensiRts };
+}

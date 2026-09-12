@@ -51,6 +51,9 @@ export async function createTransaction(input: {
       catatan: input.catatan.trim() || null,
       status: input.channel === "online" ? "proses" : input.status,
       affects_stock: input.affectsStock,
+      // Offline diserahkan langsung ke pembeli, jadi otomatis dianggap sudah
+      // "dikemas". Online defaultnya belum, ditandai manual setelah dipacking.
+      dikemas: input.channel === "offline",
     },
   ]);
 
@@ -77,6 +80,16 @@ export async function updateTransactionStatus(id: string, status: string): Promi
   revalidatePath("/dashboard");
   revalidatePath("/transaksi");
   revalidatePath("/produk");
+  return { ok: true };
+}
+
+export async function setDikemas(id: string, dikemas: boolean): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("transactions").update({ dikemas }).eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/dashboard");
+  revalidatePath("/transaksi");
   return { ok: true };
 }
 

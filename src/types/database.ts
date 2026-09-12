@@ -50,6 +50,10 @@ export type Transaction = {
   created_by: string | null; // email, kolom lama
   created_by_uid: string | null;
   affects_stock: boolean;
+  // Sudah dikemas & dikirim secara fisik atau belum — terpisah dari status
+  // pembayaran/konfirmasi (lihat 0010_dikemas_dan_alert_rts.sql). Cuma
+  // relevan untuk channel "online"; offline diserahkan langsung ke pembeli.
+  dikemas: boolean;
   created_at: string;
 };
 

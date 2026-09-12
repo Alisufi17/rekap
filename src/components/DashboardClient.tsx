@@ -4,8 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   computeDashboard,
+  computeAlerts,
   rangeForPreset,
   rangeLabel,
+  RTS_RISK_DAYS,
   type PresetKey,
   type DateRange,
 } from "@/lib/dashboard";
@@ -54,6 +56,10 @@ export default function DashboardClient({
 
   const range = preset === "custom" ? customRange : rangeForPreset(preset);
   const d = computeDashboard(transactions, dailyMetrics, range, expenses);
+  // Alert operasional, lepas dari periode yang dipilih di atas — jangan
+  // sampai pesanan yang perlu ditindaklanjuti tersembunyi gara-gara filter
+  // tanggal sedang di periode lain.
+  const alerts = computeAlerts(transactions);
 
   function applyPreset(p: PresetKey) {
     setPreset(p);
@@ -69,6 +75,42 @@ export default function DashboardClient({
 
   return (
     <div className="space-y-4">
+      {alerts.potensiRts.length > 0 && (
+        <Link
+          href="/transaksi?filter=rts_risk"
+          className="block rounded-xl border-2 border-accent/40 bg-accent/5 p-3 text-sm"
+        >
+          <div className="flex items-center justify-between">
+            <div className="font-bold text-accent">
+              ⚠ {alerts.potensiRts.length} pesanan berpotensi RTS
+            </div>
+            <span className="text-xs font-semibold text-accent">Cek →</span>
+          </div>
+          <div className="mt-0.5 text-xs text-ink-soft">
+            Masih &quot;Proses&quot; {RTS_RISK_DAYS}+ hari — segera ditindaklanjuti sebelum jadi
+            kerugian.
+          </div>
+        </Link>
+      )}
+
+      {alerts.belumDikemas.length > 0 && (
+        <Link
+          href="/transaksi?filter=belum_dikemas"
+          className="block rounded-xl border-2 border-offline/40 bg-offline/5 p-3 text-sm"
+        >
+          <div className="flex items-center justify-between">
+            <div className="font-bold text-offline">
+              📦 {alerts.belumDikemas.length} paket belum ditandai dikemas
+            </div>
+            <span className="text-xs font-semibold text-offline">Cek →</span>
+          </div>
+          <div className="mt-0.5 text-xs text-ink-soft">
+            Statusnya sudah &quot;Proses&quot; di sistem, tapi belum ada yang menandai fisiknya
+            sudah dikemas &amp; dikirim.
+          </div>
+        </Link>
+      )}
+
       {lowStockProducts.length > 0 && (
         <div className="rounded-xl border border-accent/30 bg-accent/5 p-3 text-sm">
           <div className="font-semibold text-accent">Stok menipis</div>
