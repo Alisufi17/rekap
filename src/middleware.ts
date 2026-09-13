@@ -44,6 +44,27 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Role "packing" (Hansen) cuma boleh lihat antrian kemas — jangan sampai
+  // nyasar ke dashboard/transaksi/dll walau ketik URL-nya langsung. Ini
+  // penjagaan tambahan di UI; batas keamanan sebenarnya ada di RLS
+  // (0011_role_packing.sql), bukan di sini.
+  if (user && !isLoginPage) {
+    const isPackingPage = request.nextUrl.pathname.startsWith("/packing");
+    if (!isPackingPage) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (profile?.role === "packing") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/packing";
+        return NextResponse.redirect(url);
+      }
+    }
+  }
+
   return response;
 }
 

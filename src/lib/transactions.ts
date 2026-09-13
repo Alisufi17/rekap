@@ -83,13 +83,17 @@ export async function updateTransactionStatus(id: string, status: string): Promi
   return { ok: true };
 }
 
+// Lewat RPC (bukan .update() langsung) supaya satu jalur berlaku untuk
+// semua role, termasuk "packing" (Hansen) yang RLS-nya sengaja menutup
+// akses UPDATE langsung ke tabel transactions — lihat 0011_role_packing.sql.
 export async function setDikemas(id: string, dikemas: boolean): Promise<ActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase.from("transactions").update({ dikemas }).eq("id", id);
+  const { error } = await supabase.rpc("mark_dikemas", { p_id: id, p_dikemas: dikemas });
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/dashboard");
   revalidatePath("/transaksi");
+  revalidatePath("/packing");
   return { ok: true };
 }
 

@@ -11,7 +11,7 @@
 // ke `never` tanpa pesan error yang jelas. `type` alias (object literal)
 // tidak kena masalah ini.
 
-export type UserRole = "admin" | "staff";
+export type UserRole = "admin" | "staff" | "packing";
 export type TxChannel = "online" | "offline";
 export type TxStatusOnline = "proses" | "selesai" | "rts";
 export type TxStatusOffline = "lunas" | "belum";
@@ -112,6 +112,24 @@ export type VTransaction = Transaction & {
   retur: boolean;
 };
 
+// Khusus role "packing" (Hansen) — lihat 0011_role_packing.sql. Sengaja
+// TIDAK ADA hpp/modal/profit_kotor di sini, cuma harga per transaksi untuk
+// dicocokkan ke resi. Jangan tambah kolom uang agregat ke tipe ini.
+export type VPackingQueue = {
+  id: string;
+  tanggal: string;
+  customer: string;
+  customer_phone: string | null;
+  produk_nama: string;
+  qty: number;
+  harga: number;
+  total_harga: number;
+  status: TxStatus;
+  dikemas: boolean;
+  catatan: string | null;
+  created_at: string;
+};
+
 export type VDailySales = {
   tanggal: string;
   jumlah_transaksi: number;
@@ -197,11 +215,16 @@ export type Database = {
       v_transactions: { Row: VTransaction } & NoRelationships;
       v_daily_sales: { Row: VDailySales } & NoRelationships;
       v_monthly_pnl: { Row: VMonthlyPnl } & NoRelationships;
+      v_packing_queue: { Row: VPackingQueue } & NoRelationships;
     };
     Functions: {
       salin_biaya_berulang: {
         Args: { p_bulan: string };
         Returns: number;
+      };
+      mark_dikemas: {
+        Args: { p_id: string; p_dikemas: boolean };
+        Returns: undefined;
       };
     };
   };

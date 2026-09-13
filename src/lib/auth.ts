@@ -29,3 +29,7 @@ export async function getCurrentProfile(): Promise<{
 export function isAdmin(profile: Profile | null): boolean {
   return profile?.role === "admin";
 }
+
+export function isPacking(profile: Profile | null): boolean {
+  return profile?.role === "packing";
+}
