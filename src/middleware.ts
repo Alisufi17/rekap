@@ -69,5 +69,8 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // api/integrations: server-to-server calls from wa-ai-cs, authenticated by
+  // their own shared secret (see src/lib/integrations/auth.ts) - there is no
+  // Supabase user session to redirect on the other end of that call.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/integrations).*)"],
 };
