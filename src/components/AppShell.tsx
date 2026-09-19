@@ -8,8 +8,8 @@ import { logout } from "@/app/actions";
 // Lebar konten di desktop per halaman. Halaman yang tidak terdaftar (form,
 // akun, dll) tetap sempit supaya input tidak melebar konyol di layar besar.
 const PAGE_WIDTH: Record<string, string> = {
-  "/dashboard": "lg:max-w-6xl",
-  "/transaksi": "lg:max-w-6xl",
+  "/dashboard": "lg:max-w-[1600px]",
+  "/transaksi": "lg:max-w-[1400px]",
   "/keuangan": "lg:max-w-5xl",
   "/kalender": "lg:max-w-3xl",
   "/pelanggan": "lg:max-w-3xl",
@@ -179,7 +179,7 @@ export default function AppShell({
         </header>
 
         <main className="px-4 py-4 pb-24 lg:px-8 lg:py-6 lg:pb-10">
-          <div className={`mx-auto ${width}`}>
+          <div className={width}>
             {title && (
               <h1 className="mb-5 hidden text-2xl font-extrabold text-ink lg:block">{title}</h1>
             )}

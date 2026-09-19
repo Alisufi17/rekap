@@ -203,7 +203,7 @@ export default function DashboardClient({
 
       <div className="text-xs text-ink-faint lg:col-span-12">{rangeLabel(preset, range)}</div>
 
-      <div className="rounded-xl border border-border bg-white p-4 lg:col-span-6 xl:col-span-4">
+      <div className="rounded-xl border border-border bg-white p-4 lg:col-span-6 xl:col-span-4 min-[1800px]:col-span-3">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-xs font-semibold text-ink-soft">Perkiraan Omset</div>
           <div className="num text-base font-extrabold">{fmtIDR(d.estimasiOmset)}</div>
@@ -220,7 +220,7 @@ export default function DashboardClient({
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-white p-4 lg:col-span-6 xl:col-span-4">
+      <div className="rounded-xl border border-border bg-white p-4 lg:col-span-6 xl:col-span-4 min-[1800px]:col-span-3">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-xs font-semibold text-ink-soft">Perkiraan Profit</div>
           <div className="num text-base font-extrabold">{fmtIDR(d.estimasiProfit)}</div>
@@ -294,7 +294,7 @@ export default function DashboardClient({
       </div>
 
       {isAdmin && (
-        <div className="rounded-xl border-2 border-primary/30 bg-white p-4 lg:col-span-6 xl:col-span-4">
+        <div className="rounded-xl border-2 border-primary/30 bg-white p-4 lg:col-span-6 xl:col-span-4 min-[1800px]:col-span-3">
           <div className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-ink-soft">
             Hasil Final (bukan perkiraan)
           </div>
@@ -351,7 +351,7 @@ export default function DashboardClient({
       )}
 
       {d.produkQtyPeriode.length > 0 && (
-        <div className="rounded-xl border border-border bg-white p-4 lg:col-span-6 xl:col-span-4">
+        <div className="rounded-xl border border-border bg-white p-4 lg:col-span-6 xl:col-span-4 min-[1800px]:col-span-3">
           <div className="mb-2 flex items-center justify-between">
             <div className="text-xs font-semibold text-ink-soft">Paket & Produk Terjual</div>
             <div className="text-sm font-bold">
