@@ -208,3 +208,20 @@ export async function getWaOrderFinancials(
   }
   return result;
 }
+
+// Owner request 2026-09-19 ("aku mau namanya ditulis manual saja", and "biar
+// masuk ke kasir ada nama customernya"): the customer name is typed by hand in
+// wa-ai-cs, and naming (or renaming) a customer afterwards has to reach the
+// transactions that order already created here. Only the `customer` label is
+// touched - never money, status or stock.
+export interface WaOrderRenameDeps {
+  updateCustomerByOrderId: (orderId: string, customer: string) => Promise<number>;
+}
+
+export async function renameWaOrderCustomer(
+  orderId: string,
+  customer: string,
+  deps: WaOrderRenameDeps,
+): Promise<number> {
+  return deps.updateCustomerByOrderId(orderId, customer);
+}

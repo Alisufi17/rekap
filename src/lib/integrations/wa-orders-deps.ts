@@ -1,6 +1,25 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import type { WaDailyChatsDeps } from "./wa-daily-chats";
-import type { WaOrderDeps, WaOrderFinancialsDeps } from "./wa-orders";
+import type { WaOrderDeps, WaOrderFinancialsDeps, WaOrderRenameDeps } from "./wa-orders";
+
+export function createRealWaOrderRenameDeps(): WaOrderRenameDeps {
+  const supabase = createServiceClient();
+  return {
+    async updateCustomerByOrderId(orderId, customer) {
+      // Same match rule as the delivered-mark: pushWaOrder tags every row's
+      // catatan with the order id. Only the label column is written.
+      const { data, error } = await supabase
+        .from("transactions")
+        .update({ customer })
+        .ilike("catatan", `%${orderId}%`)
+        .select("id");
+      if (error) {
+        throw new Error(`Customer rename failed: ${error.message}`);
+      }
+      return data?.length ?? 0;
+    },
+  };
+}
 
 export function createRealWaDailyChatsDeps(): WaDailyChatsDeps {
   const supabase = createServiceClient();

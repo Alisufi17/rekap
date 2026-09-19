@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getWaOrderFinancials,
   markWaOrderDelivered,
+  renameWaOrderCustomer,
   ProductMissingHppError,
   ProductNotFoundError,
   pushWaOrder,
@@ -285,5 +286,23 @@ describe("getWaOrderFinancials", () => {
 
     expect(result).toEqual({});
     expect(called).toBe(false);
+  });
+});
+
+// Owner request 2026-09-19: naming a customer by hand in wa-ai-cs also has to
+// reach the transactions their orders already created here.
+describe("renameWaOrderCustomer", () => {
+  it("hands the order id and the new label to the dependency and returns how many rows changed", async () => {
+    const calls: [string, string][] = [];
+
+    const count = await renameWaOrderCustomer("order-1", "Bu Sari", {
+      updateCustomerByOrderId: async (orderId, customer) => {
+        calls.push([orderId, customer]);
+        return 2;
+      },
+    });
+
+    expect(count).toBe(2);
+    expect(calls).toEqual([["order-1", "Bu Sari"]]);
   });
 });
