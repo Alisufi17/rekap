@@ -5,7 +5,7 @@ export default async function PackingLayout({ children }: { children: React.Reac
   const { email } = await getCurrentProfile();
 
   return (
-    <div>
+    <div className="mx-auto max-w-md pb-10 lg:max-w-2xl">
       <div className="flex items-center justify-between border-b border-border bg-white px-5 py-4">
         <div className="text-lg font-extrabold text-ink">
           Rekap<span className="text-primary">.</span>{" "}

@@ -40,12 +40,16 @@ export default function KeuanganClient({
   const bulanIni = firstOfMonth();
 
   return (
-    <div className="space-y-5">
-      <RingkasanBulan pnl={pnl} />
-      <TargetForm bulan={bulanIni} target={target} />
-      <PencairanDanaSection dana={pencairanDana} />
-      <TopUpIklanForm />
-      <BiayaOperasional bulan={bulanIni} categories={categories} expenses={expenses} />
+    <div className="space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
+      <div className="space-y-5">
+        <RingkasanBulan pnl={pnl} />
+        <TargetForm bulan={bulanIni} target={target} />
+        <TopUpIklanForm />
+      </div>
+      <div className="space-y-5">
+        <PencairanDanaSection dana={pencairanDana} />
+        <BiayaOperasional bulan={bulanIni} categories={categories} expenses={expenses} />
+      </div>
     </div>
   );
 }

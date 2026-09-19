@@ -230,7 +230,7 @@ function DateGroup({
           {transactions.length} transaksi · <span className="num">{fmtIDR(omsetTerkonfirmasi)}</span>
         </div>
       </div>
-      <div className="space-y-3">
+      <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
         {transactions.map((t) => (
           <TxCard key={t.id} t={t} products={products} isAdmin={isAdmin} />
         ))}

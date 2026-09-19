@@ -38,6 +38,7 @@ export default function TrendChart({
         ],
       },
       options: {
+        maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: { label: (c) => fmtIDR(c.parsed.y) } },
@@ -64,7 +65,9 @@ export default function TrendChart({
 
   return (
     <div className="rounded-xl border border-border bg-white p-3">
-      <canvas ref={canvasRef} height={140} />
+      <div className="relative h-40 lg:h-72">
+        <canvas ref={canvasRef} />
+      </div>
     </div>
   );
 }

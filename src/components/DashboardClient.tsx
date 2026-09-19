@@ -74,11 +74,11 @@ export default function DashboardClient({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 lg:grid lg:grid-cols-12 lg:items-start lg:gap-4 lg:space-y-0">
       {alerts.potensiRts.length > 0 && (
         <Link
           href="/transaksi?filter=rts_risk"
-          className="block rounded-xl border-2 border-accent/40 bg-accent/5 p-3 text-sm"
+          className="block rounded-xl border-2 border-accent/40 bg-accent/5 p-3 text-sm lg:col-span-6"
         >
           <div className="flex items-center justify-between">
             <div className="font-bold text-accent">
@@ -96,7 +96,7 @@ export default function DashboardClient({
       {alerts.belumDikemas.length > 0 && (
         <Link
           href="/transaksi?filter=belum_dikemas"
-          className="block rounded-xl border-2 border-offline/40 bg-offline/5 p-3 text-sm"
+          className="block rounded-xl border-2 border-offline/40 bg-offline/5 p-3 text-sm lg:col-span-6"
         >
           <div className="flex items-center justify-between">
             <div className="font-bold text-offline">
@@ -112,7 +112,7 @@ export default function DashboardClient({
       )}
 
       {lowStockProducts.length > 0 && (
-        <div className="rounded-xl border border-accent/30 bg-accent/5 p-3 text-sm">
+        <div className="rounded-xl border border-accent/30 bg-accent/5 p-3 text-sm lg:col-span-12">
           <div className="font-semibold text-accent">Stok menipis</div>
           <div className="mt-1 space-y-0.5 text-ink-soft">
             {lowStockProducts.map((p) => (
@@ -125,7 +125,7 @@ export default function DashboardClient({
       )}
 
       {isAdmin && monthlyPnl && (monthlyPnl.target_omset || monthlyPnl.target_profit) ? (
-        <div className="rounded-xl border border-border bg-white p-4">
+        <div className="rounded-xl border border-border bg-white p-4 lg:col-span-12">
           <div className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
             Target Bulan Ini
           </div>
@@ -148,7 +148,7 @@ export default function DashboardClient({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-1.5 rounded-lg bg-white p-1.5 text-xs">
+      <div className="flex flex-wrap gap-1.5 rounded-lg bg-white p-1.5 text-xs lg:col-span-12 lg:text-sm">
         {PRESETS.map(([key, label]) => (
           <button
             key={key}
@@ -171,7 +171,7 @@ export default function DashboardClient({
       </div>
 
       {showCustomPicker && (
-        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-border bg-white p-3">
+        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-border bg-white p-3 lg:col-span-12">
           <div>
             <label className="mb-1 block text-xs font-medium text-ink-soft">Dari</label>
             <input
@@ -201,9 +201,9 @@ export default function DashboardClient({
         </div>
       )}
 
-      <div className="text-xs text-ink-faint">{rangeLabel(preset, range)}</div>
+      <div className="text-xs text-ink-faint lg:col-span-12">{rangeLabel(preset, range)}</div>
 
-      <div className="rounded-xl border border-border bg-white p-4">
+      <div className="rounded-xl border border-border bg-white p-4 lg:col-span-6 xl:col-span-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-xs font-semibold text-ink-soft">Perkiraan Omset</div>
           <div className="num text-base font-extrabold">{fmtIDR(d.estimasiOmset)}</div>
@@ -220,7 +220,7 @@ export default function DashboardClient({
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-white p-4">
+      <div className="rounded-xl border border-border bg-white p-4 lg:col-span-6 xl:col-span-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="text-xs font-semibold text-ink-soft">Perkiraan Profit</div>
           <div className="num text-base font-extrabold">{fmtIDR(d.estimasiProfit)}</div>
@@ -294,7 +294,7 @@ export default function DashboardClient({
       </div>
 
       {isAdmin && (
-        <div className="rounded-xl border-2 border-primary/30 bg-white p-4">
+        <div className="rounded-xl border-2 border-primary/30 bg-white p-4 lg:col-span-6 xl:col-span-4">
           <div className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-ink-soft">
             Hasil Final (bukan perkiraan)
           </div>
@@ -351,7 +351,7 @@ export default function DashboardClient({
       )}
 
       {d.produkQtyPeriode.length > 0 && (
-        <div className="rounded-xl border border-border bg-white p-4">
+        <div className="rounded-xl border border-border bg-white p-4 lg:col-span-6 xl:col-span-4">
           <div className="mb-2 flex items-center justify-between">
             <div className="text-xs font-semibold text-ink-soft">Paket & Produk Terjual</div>
             <div className="text-sm font-bold">
@@ -370,7 +370,7 @@ export default function DashboardClient({
       )}
 
       {d.pendingCount > 0 && (
-        <div className="flex items-center justify-between rounded-xl border-l-4 border-primary bg-white p-3">
+        <div className="flex items-center justify-between rounded-xl border-l-4 border-primary bg-white p-3 lg:col-span-6">
           <div>
             <div className="text-sm font-bold">{d.pendingCount} transaksi masih Proses</div>
             <div className="text-xs text-ink-soft">
@@ -387,7 +387,7 @@ export default function DashboardClient({
       )}
 
       {d.piutang > 0 && (
-        <div className="flex items-center justify-between rounded-xl border-l-4 border-offline bg-white p-3">
+        <div className="flex items-center justify-between rounded-xl border-l-4 border-offline bg-white p-3 lg:col-span-6">
           <div>
             <div className="text-sm font-bold">Piutang: {fmtIDR(d.piutang)}</div>
             <div className="text-xs text-ink-soft">Transaksi offline yang belum lunas</div>
@@ -401,7 +401,7 @@ export default function DashboardClient({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5 lg:col-span-12">
         <StatBox
           label="Online"
           value={fmtIDR(d.onlineOmset)}
@@ -416,34 +416,38 @@ export default function DashboardClient({
         />
       </div>
 
-      <SectionTitle>Tren Omset</SectionTitle>
-      <TrendChart buckets={d.buckets} />
+      <div className="space-y-4 lg:col-span-8">
+        <SectionTitle>Tren Omset</SectionTitle>
+        <TrendChart buckets={d.buckets} />
+      </div>
 
-      <SectionTitle>Produk Terlaris</SectionTitle>
-      <div className="rounded-xl border border-border bg-white p-3">
-        {d.topProduk.length === 0 ? (
-          <Empty icon="📦">Belum ada penjualan di periode ini</Empty>
-        ) : (
-          d.topProduk.map(([nama, v], i) => (
-            <div
-              key={nama}
-              className="flex items-center gap-3 border-b border-border py-2.5 last:border-0"
-            >
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-surface text-xs font-bold">
-                {i + 1}
+      <div className="space-y-4 lg:col-span-4">
+        <SectionTitle>Produk Terlaris</SectionTitle>
+        <div className="rounded-xl border border-border bg-white p-3">
+          {d.topProduk.length === 0 ? (
+            <Empty icon="📦">Belum ada penjualan di periode ini</Empty>
+          ) : (
+            d.topProduk.map(([nama, v], i) => (
+              <div
+                key={nama}
+                className="flex items-center gap-3 border-b border-border py-2.5 last:border-0"
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-surface text-xs font-bold">
+                  {i + 1}
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium">{nama}</div>
+                  <div className="text-xs text-ink-faint">{v.qty} terjual</div>
+                </div>
+                <div className="num text-sm font-semibold">{fmtIDR(v.omset)}</div>
               </div>
-              <div className="flex-1">
-                <div className="text-sm font-medium">{nama}</div>
-                <div className="text-xs text-ink-faint">{v.qty} terjual</div>
-              </div>
-              <div className="num text-sm font-semibold">{fmtIDR(v.omset)}</div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
 
       {isAdmin && (
-        <>
+        <div className="space-y-4 lg:col-span-6">
           <SectionTitle>
             Iklan &amp; Chat Masuk{" "}
             <Link href="/dashboard/iklan" className="text-xs font-semibold text-primary">
@@ -470,34 +474,36 @@ export default function DashboardClient({
             <Row label="Biaya per transaksi (CPA)" value={fmtIDR(d.cpa)} />
             <Row label="ROAS (omset online / spend)" value={`${d.roas.toFixed(1)}x`} last />
           </div>
-        </>
+        </div>
       )}
 
-      <SectionTitle>
-        Retur / RTS {d.rtsList.length > 0 && <Badge>{d.rtsList.length}</Badge>}
-      </SectionTitle>
-      <div className="rounded-xl border border-border bg-white p-3">
-        {d.rtsList.length === 0 ? (
-          <Empty icon="✅">Tidak ada retur di periode ini</Empty>
-        ) : (
-          d.rtsList.slice(0, 5).map((t) => (
-            <div
-              key={t.id}
-              className="flex items-center justify-between border-b border-border py-2.5 last:border-0"
-            >
-              <div>
-                <div className="text-sm font-medium">{t.produk_nama}</div>
-                <div className="text-xs text-ink-faint">
-                  {t.customer} · {fmtDate(t.tanggal)}
+      <div className="space-y-4 lg:col-span-6">
+        <SectionTitle>
+          Retur / RTS {d.rtsList.length > 0 && <Badge>{d.rtsList.length}</Badge>}
+        </SectionTitle>
+        <div className="rounded-xl border border-border bg-white p-3">
+          {d.rtsList.length === 0 ? (
+            <Empty icon="✅">Tidak ada retur di periode ini</Empty>
+          ) : (
+            d.rtsList.slice(0, 5).map((t) => (
+              <div
+                key={t.id}
+                className="flex items-center justify-between border-b border-border py-2.5 last:border-0"
+              >
+                <div>
+                  <div className="text-sm font-medium">{t.produk_nama}</div>
+                  <div className="text-xs text-ink-faint">
+                    {t.customer} · {fmtDate(t.tanggal)}
+                  </div>
                 </div>
+                <div className="num text-sm font-semibold text-accent">{fmtIDR(t.omset)}</div>
               </div>
-              <div className="num text-sm font-semibold text-accent">{fmtIDR(t.omset)}</div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
 
-      <div className="space-y-2 pt-1">
+      <div className="space-y-2 pt-1 lg:hidden">
         <Link
           href="/kalender"
           className="block rounded-lg border border-border bg-white py-2.5 text-center text-sm font-medium"
@@ -572,7 +578,7 @@ function BreakdownRow({
         <span className={`h-2 w-2 rounded-full ${dot}`} />
         {label} <span className="text-xs text-ink-faint">({count})</span>
       </span>
-      <span className={`num font-semibold ${valueColor}`}>{fmtIDR(value)}</span>
+      <span className={`num whitespace-nowrap pl-2 font-semibold ${valueColor}`}>{fmtIDR(value)}</span>
     </div>
   );
 }
