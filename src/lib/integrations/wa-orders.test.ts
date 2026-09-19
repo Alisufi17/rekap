@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  getWaOrderFinancials,
   markWaOrderDelivered,
   ProductMissingHppError,
   ProductNotFoundError,
   pushWaOrder,
   type TransactionInsertRow,
   type WaOrderDeps,
+  type WaOrderTransactionRow,
 } from "./wa-orders";
 
 // wa-ai-cs (the owner's separate WhatsApp AI customer-service system) posts
@@ -137,5 +139,110 @@ describe("markWaOrderDelivered", () => {
 
     expect(count).toBe(2);
     expect(delivered).toEqual(["order-1"]);
+  });
+});
+
+// Owner request 2026-09-19: wa-ai-cs shows this app's real HPP/profit next to
+// its own orders. The money columns come straight from v_transactions (fed in
+// here as rows) - what's tested is the grouping by order id and the summing.
+function row(overrides: Partial<WaOrderTransactionRow> = {}): WaOrderTransactionRow {
+  return {
+    catatan: "Order WA (otomatis) - order order-1",
+    produk_nama: "Kiojay Harga Normal",
+    qty: 1,
+    harga: 99000,
+    hpp: 18000,
+    ongkir: 0,
+    admin: 0,
+    omset: 99000,
+    modal: 18000,
+    biaya_transaksi: 2000,
+    profit_kotor: 79000,
+    status: "proses",
+    terkonfirmasi: false,
+    estimasi: true,
+    retur: false,
+    ...overrides,
+  };
+}
+
+describe("getWaOrderFinancials", () => {
+  it("sums a multi-row order: HPP as modal, shipping once, packing fee under biayaLain, profit as Kasir computed it", async () => {
+    const rows = [
+      row({ qty: 1, harga: 99000, omset: 99000, modal: 18000, ongkir: 20000, biaya_transaksi: 22000, profit_kotor: 59000 }),
+      row({ qty: 2, harga: 79500, omset: 159000, modal: 36000, ongkir: 0, biaya_transaksi: 2000, profit_kotor: 121000 }),
+    ];
+
+    const result = await getWaOrderFinancials(["order-1"], { findTransactionsByOrderIds: async () => rows });
+
+    expect(result["order-1"]).toEqual({
+      status: "proses",
+      omset: 258000,
+      modal: 54000,
+      ongkir: 20000,
+      biayaLain: 4000,
+      profitKotor: 180000,
+      items: [
+        { produkNama: "Kiojay Harga Normal", qty: 1, harga: 99000, hpp: 18000 },
+        { produkNama: "Kiojay Harga Normal", qty: 2, harga: 79500, hpp: 18000 },
+      ],
+    });
+  });
+
+  it("keeps different orders apart and leaves an order Kasir never received out of the result", async () => {
+    const rows = [
+      row({ catatan: "Order WA (otomatis) - order order-1" }),
+      row({ catatan: "Order WA (otomatis) - order order-2", profit_kotor: 50000 }),
+    ];
+
+    const result = await getWaOrderFinancials(["order-1", "order-2", "order-3"], {
+      findTransactionsByOrderIds: async () => rows,
+    });
+
+    expect(Object.keys(result).sort()).toEqual(["order-1", "order-2"]);
+    expect(result["order-2"]!.profitKotor).toBe(50000);
+  });
+
+  it("is final (selesai) only once every row is confirmed, and rts wins over everything", async () => {
+    const done = row({ terkonfirmasi: true, estimasi: false, status: "selesai" });
+    const pending = row({ terkonfirmasi: false });
+    const returned = row({ retur: true, status: "rts", terkonfirmasi: false });
+
+    const status = async (rows: WaOrderTransactionRow[]) =>
+      (await getWaOrderFinancials(["order-1"], { findTransactionsByOrderIds: async () => rows }))["order-1"]!.status;
+
+    expect(await status([done, done])).toBe("selesai");
+    expect(await status([done, pending])).toBe("proses");
+    expect(await status([done, returned])).toBe("rts");
+  });
+
+  it("still matches when staff typed extra text around the order id in catatan", async () => {
+    const rows = [row({ catatan: "Order WA (otomatis) - order order-1 | sudah dikonfirmasi lewat telepon" })];
+
+    const result = await getWaOrderFinancials(["order-1"], { findTransactionsByOrderIds: async () => rows });
+
+    expect(result["order-1"]).toBeDefined();
+  });
+
+  it("coerces numeric strings (a driver may return numeric as text) instead of concatenating them", async () => {
+    const rows = [row({ modal: "18000" as unknown as number, profit_kotor: "79000" as unknown as number })];
+
+    const result = await getWaOrderFinancials(["order-1"], { findTransactionsByOrderIds: async () => rows });
+
+    expect(result["order-1"]!.modal).toBe(18000);
+    expect(result["order-1"]!.profitKotor).toBe(79000);
+  });
+
+  it("does not query at all for an empty id list", async () => {
+    let called = false;
+    const result = await getWaOrderFinancials([], {
+      findTransactionsByOrderIds: async () => {
+        called = true;
+        return [];
+      },
+    });
+
+    expect(result).toEqual({});
+    expect(called).toBe(false);
   });
 });

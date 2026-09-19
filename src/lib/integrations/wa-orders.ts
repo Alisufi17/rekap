@@ -1,4 +1,4 @@
-import type { Transaction } from "@/types/database";
+import type { Transaction, VTransaction } from "@/types/database";
 
 // Owner request 2026-09-15: wa-ai-cs (the owner's separate WhatsApp AI
 // customer-service system, own repo) used to write straight into this app's
@@ -109,4 +109,88 @@ export async function pushWaOrder(input: PushWaOrderInput, deps: WaOrderDeps): P
 
 export async function markWaOrderDelivered(orderId: string, deps: WaOrderDeps): Promise<number> {
   return deps.updateDeliveredByOrderId(orderId);
+}
+
+// Owner request 2026-09-19: wa-ai-cs's order page should show the real HPP
+// and profit from here instead of guessing them - "di kasir kiojay aku ada
+// hppnya, jadi hasilnya lebih akurat". Read-only: nothing here writes, and the
+// money math is NOT redone - `v_transactions` (see supabase/migrations/
+// 0008_biaya_packing.sql) stays the one place profit is defined, so this
+// can't drift if that formula ever changes (it also already reflects any
+// edit made to the transaction on this app's own edit-pesanan screen).
+export type WaOrderTransactionRow = Pick<
+  VTransaction,
+  | "catatan"
+  | "produk_nama"
+  | "qty"
+  | "harga"
+  | "hpp"
+  | "ongkir"
+  | "admin"
+  | "omset"
+  | "modal"
+  | "biaya_transaksi"
+  | "profit_kotor"
+  | "status"
+  | "terkonfirmasi"
+  | "estimasi"
+  | "retur"
+>;
+
+export interface WaOrderFinancialsDeps {
+  findTransactionsByOrderIds: (orderIds: string[]) => Promise<WaOrderTransactionRow[]>;
+}
+
+export interface WaOrderFinancials {
+  // "selesai" = delivered, the profit below is final. "proses" = still on its
+  // way, so it's an estimate. "rts" = returned to sender.
+  status: "proses" | "selesai" | "rts";
+  omset: number;
+  // Sum of qty x hpp - this app's own cost price, the point of this endpoint.
+  modal: number;
+  ongkir: number;
+  // Everything else this app subtracts per transaction that isn't ongkir:
+  // the fixed packing fee plus any marketplace/admin fee.
+  biayaLain: number;
+  profitKotor: number;
+  items: { produkNama: string; qty: number; harga: number; hpp: number }[];
+}
+
+function summarizeWaOrderRows(rows: WaOrderTransactionRow[]): WaOrderFinancials {
+  // numeric columns can arrive as strings depending on the driver; coerce once.
+  const n = (value: unknown) => Number(value ?? 0);
+  const ongkir = rows.reduce((sum, r) => sum + n(r.ongkir), 0);
+  const biayaTransaksi = rows.reduce((sum, r) => sum + n(r.biaya_transaksi), 0);
+  const status = rows.some((r) => r.retur) ? "rts" : rows.every((r) => r.terkonfirmasi) ? "selesai" : "proses";
+  return {
+    status,
+    omset: rows.reduce((sum, r) => sum + n(r.omset), 0),
+    modal: rows.reduce((sum, r) => sum + n(r.modal), 0),
+    ongkir,
+    biayaLain: biayaTransaksi - ongkir,
+    profitKotor: rows.reduce((sum, r) => sum + n(r.profit_kotor), 0),
+    items: rows.map((r) => ({ produkNama: r.produk_nama, qty: n(r.qty), harga: n(r.harga), hpp: n(r.hpp) })),
+  };
+}
+
+// An order id absent from the result simply hasn't reached this app (not
+// synced yet, or synced under an id nobody can match) - the caller shows "-",
+// it isn't an error.
+export async function getWaOrderFinancials(
+  orderIds: string[],
+  deps: WaOrderFinancialsDeps,
+): Promise<Record<string, WaOrderFinancials>> {
+  const ids = [...new Set(orderIds)];
+  if (ids.length === 0) return {};
+  const rows = await deps.findTransactionsByOrderIds(ids);
+  const result: Record<string, WaOrderFinancials> = {};
+  for (const id of ids) {
+    // Same match rule markWaOrderDelivered uses: pushWaOrder tags every row's
+    // catatan with the order id, and staff may have typed more around it.
+    const mine = rows.filter((r) => r.catatan?.includes(id));
+    if (mine.length > 0) {
+      result[id] = summarizeWaOrderRows(mine);
+    }
+  }
+  return result;
 }
