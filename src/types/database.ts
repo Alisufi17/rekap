@@ -71,6 +71,7 @@ export type ExpenseCategoryCode =
   | "sewa"
   | "transport"
   | "platform"
+  | "topup_iklan"
   | "lainnya";
 
 export type ExpenseCategory = {
@@ -97,6 +98,18 @@ export type MonthlyTarget = {
   target_profit: number;
   catatan: string | null;
   updated_at: string;
+};
+
+// Log kas masuk dari pencairan dana platform pengantaran (mis. "Mengantar").
+// Sengaja cuma pencatatan sederhana, bukan rekonsiliasi ke omset tercatat.
+export type PencairanDana = {
+  id: string;
+  tanggal: string;
+  sumber: string;
+  nominal: number;
+  catatan: string | null;
+  created_by_uid: string | null;
+  created_at: string;
 };
 
 // ---- Views (lihat 0004_financial_views.sql) ----
@@ -209,6 +222,11 @@ export type Database = {
         Row: MonthlyTarget;
         Insert: Partial<MonthlyTarget>;
         Update: Partial<MonthlyTarget>;
+      } & NoRelationships;
+      pencairan_dana: {
+        Row: PencairanDana;
+        Insert: Partial<PencairanDana>;
+        Update: Partial<PencairanDana>;
       } & NoRelationships;
     };
     Views: {

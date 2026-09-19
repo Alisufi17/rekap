@@ -71,6 +71,38 @@ export async function deleteOperatingExpense(id: string): Promise<ActionResult> 
   return { ok: true };
 }
 
+export async function addPencairanDana(input: {
+  tanggal: string;
+  sumber: string;
+  nominal: number;
+  catatan: string;
+}): Promise<ActionResult> {
+  await requireAdmin();
+  if (input.nominal <= 0) return { ok: false, error: "Nominal harus lebih dari 0" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("pencairan_dana").insert([
+    {
+      tanggal: input.tanggal,
+      sumber: input.sumber.trim() || "Mengantar",
+      nominal: input.nominal,
+      catatan: input.catatan.trim() || null,
+    },
+  ]);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/keuangan");
+  return { ok: true };
+}
+
+export async function deletePencairanDana(id: string): Promise<ActionResult> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase.from("pencairan_dana").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/keuangan");
+  return { ok: true };
+}
+
 // Menyalin biaya bertanda `berulang` (gaji, listrik, sewa) dari bulan
 // sebelumnya, lihat salin_biaya_berulang() di 0003_expenses_and_targets.sql.
 export async function copyRecurringExpenses(bulan: string): Promise<ActionResult & { count?: number }> {

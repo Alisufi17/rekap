@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { updateTransactionStatus, deleteTransaction, setDikemas } from "@/lib/transactions";
 import { fmtIDR, fmtDate, waLink, todayStr } from "@/lib/format";
 import { rangeForPreset, RTS_RISK_DAYS, type PresetKey } from "@/lib/dashboard";
-import type { VTransaction } from "@/types/database";
+import EditTransaksiForm from "@/components/EditTransaksiForm";
+import type { Product, VTransaction } from "@/types/database";
 
 const FILTERS: [string, string][] = [
   ["all", "Semua"],
@@ -34,10 +35,12 @@ const DATE_PRESETS: [PresetKey | "semua", string][] = [
 
 export default function TransaksiList({
   transactions,
+  products,
   isAdmin,
   initialFilter,
 }: {
   transactions: VTransaction[];
+  products: Product[];
   isAdmin: boolean;
   initialFilter?: string;
 }) {
@@ -49,15 +52,30 @@ export default function TransaksiList({
   );
   const [customDate, setCustomDate] = useState(todayStr());
   const [useCustomDate, setUseCustomDate] = useState(false);
+  const [search, setSearch] = useState("");
+  const isSearching = search.trim().length > 0;
 
   const dateFiltered = useMemo(() => {
+    // Lagi cari nama? Cari di SEMUA tanggal — user biasanya tidak ingat
+    // persis kapan transaksinya, cuma ingat namanya.
+    if (isSearching) return transactions;
     if (useCustomDate) return transactions.filter((t) => t.tanggal === customDate);
     if (datePreset === "semua") return transactions;
     const range = rangeForPreset(datePreset);
     return transactions.filter((t) => t.tanggal >= range.from && t.tanggal <= range.to);
-  }, [transactions, datePreset, useCustomDate, customDate]);
+  }, [transactions, datePreset, useCustomDate, customDate, isSearching]);
 
-  const filtered = dateFiltered.filter((t) => {
+  const searchFiltered = useMemo(() => {
+    if (!isSearching) return dateFiltered;
+    const q = search.trim().toLowerCase();
+    return dateFiltered.filter(
+      (t) =>
+        t.customer.toLowerCase().includes(q) ||
+        (t.customer_phone ?? "").toLowerCase().includes(q)
+    );
+  }, [dateFiltered, isSearching, search]);
+
+  const filtered = searchFiltered.filter((t) => {
     if (filter === "all") return true;
     if (filter === "online") return t.channel === "online";
     if (filter === "offline") return t.channel === "offline";
@@ -88,7 +106,37 @@ export default function TransaksiList({
 
   return (
     <div>
-      <div className="mb-2 flex flex-wrap gap-1.5 rounded-lg bg-white p-1.5 text-xs">
+      <div className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2">
+        <svg
+          className="h-4 w-4 flex-shrink-0 text-ink-faint"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="M21 21l-4.3-4.3" />
+        </svg>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Cari nama atau nomor HP pelanggan..."
+          className="w-full text-sm outline-none placeholder:text-ink-faint"
+        />
+        {isSearching && (
+          <button onClick={() => setSearch("")} className="text-xs font-medium text-ink-faint">
+            ✕
+          </button>
+        )}
+      </div>
+
+      <div
+        className={`mb-2 flex flex-wrap gap-1.5 rounded-lg bg-white p-1.5 text-xs ${
+          isSearching ? "pointer-events-none opacity-40" : ""
+        }`}
+      >
         {DATE_PRESETS.map(([key, label]) => (
           <button
             key={key}
@@ -113,6 +161,11 @@ export default function TransaksiList({
           }`}
         />
       </div>
+      {isSearching && (
+        <div className="mb-2 text-xs text-ink-faint">
+          Menampilkan hasil pencarian dari semua tanggal — filter tanggal dinonaktifkan sementara.
+        </div>
+      )}
 
       <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
         {FILTERS.map(([key, label]) => (
@@ -136,7 +189,13 @@ export default function TransaksiList({
       ) : (
         <div className="space-y-5">
           {groups.map(([tanggal, txs]) => (
-            <DateGroup key={tanggal} tanggal={tanggal} transactions={txs} isAdmin={isAdmin} />
+            <DateGroup
+              key={tanggal}
+              tanggal={tanggal}
+              transactions={txs}
+              products={products}
+              isAdmin={isAdmin}
+            />
           ))}
         </div>
       )}
@@ -147,10 +206,12 @@ export default function TransaksiList({
 function DateGroup({
   tanggal,
   transactions,
+  products,
   isAdmin,
 }: {
   tanggal: string;
   transactions: VTransaction[];
+  products: Product[];
   isAdmin: boolean;
 }) {
   const omsetTerkonfirmasi = transactions
@@ -171,14 +232,23 @@ function DateGroup({
       </div>
       <div className="space-y-3">
         {transactions.map((t) => (
-          <TxCard key={t.id} t={t} isAdmin={isAdmin} />
+          <TxCard key={t.id} t={t} products={products} isAdmin={isAdmin} />
         ))}
       </div>
     </div>
   );
 }
 
-function TxCard({ t, isAdmin }: { t: VTransaction; isAdmin: boolean }) {
+function TxCard({
+  t,
+  products,
+  isAdmin,
+}: {
+  t: VTransaction;
+  products: Product[];
+  isAdmin: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dikemasBusy, setDikemasBusy] = useState(false);
   const statusLabel =
@@ -217,6 +287,10 @@ function TxCard({ t, isAdmin }: { t: VTransaction; isAdmin: boolean }) {
   }
 
   const wa = waLink(t.customer_phone);
+
+  if (editing) {
+    return <EditTransaksiForm t={t} products={products} onDone={() => setEditing(false)} />;
+  }
 
   return (
     <div
@@ -294,6 +368,13 @@ function TxCard({ t, isAdmin }: { t: VTransaction; isAdmin: boolean }) {
             Chat WA
           </a>
         )}
+        <button
+          disabled={busy}
+          onClick={() => setEditing(true)}
+          className="rounded-lg border border-border px-2 py-1.5 text-xs font-medium text-ink-soft"
+        >
+          Edit
+        </button>
         {isAdmin && (
           <button
             disabled={busy}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createTransaction } from "@/lib/transactions";
 import { fmtIDR, todayStr } from "@/lib/format";
+import { BIAYA_PACKING, hitungOngkir, hitungProfitPreview } from "@/lib/pricing";
 import type { Product } from "@/types/database";
 
 const DRAFT_KEY = "rekap_tx_draft_v2";
@@ -57,7 +58,9 @@ export default function TambahTransaksiForm({ products }: { products: Product[] 
   const [qty, setQty] = useState("1");
   const [total, setTotal] = useState("");
   const [hpp, setHpp] = useState(String(products[0]?.hpp ?? 0));
-  const [ongkir, setOngkir] = useState("");
+  // null = pakai tarif standar SiCepat sesuai qty; string = owner/staff
+  // mengetik ongkir sendiri (mis. tujuan luar zona).
+  const [ongkirOverride, setOngkirOverride] = useState<string | null>(null);
   const [catatan, setCatatan] = useState("");
   const [lunas, setLunas] = useState("lunas");
   const [historis, setHistoris] = useState(false);
@@ -74,7 +77,9 @@ export default function TambahTransaksiForm({ products }: { products: Product[] 
     if (d.qty) setQty(d.qty);
     if (d.total) setTotal(d.total);
     if (d.hpp) setHpp(d.hpp);
-    if (d.ongkir) setOngkir(d.ongkir);
+    if (d.ongkir && Number(d.ongkir) !== hitungOngkir(Number(d.qty) || 1)) {
+      setOngkirOverride(d.ongkir);
+    }
     if (d.catatan) setCatatan(d.catatan);
     if (d.lunas) setLunas(d.lunas);
     if (d.historis) setHistoris(d.historis);
@@ -93,12 +98,12 @@ export default function TambahTransaksiForm({ products }: { products: Product[] 
       qty,
       total,
       hpp,
-      ongkir,
+      ongkir: ongkirOverride ?? "",
       catatan,
       lunas,
       historis,
     });
-  }, [ready, channel, tanggal, customer, phone, produkId, qty, total, hpp, ongkir, catatan, lunas, historis]);
+  }, [ready, channel, tanggal, customer, phone, produkId, qty, total, hpp, ongkirOverride, catatan, lunas, historis]);
 
   if (products.length === 0) {
     return (
@@ -114,12 +119,17 @@ export default function TambahTransaksiForm({ products }: { products: Product[] 
   const qtyNum = parseFloat(qty) || 0;
   const totalNum = parseFloat(total) || 0;
   const hppNum = parseFloat(hpp) || 0;
-  const ongkirNum = parseFloat(ongkir) || 0;
+  const ongkirStandar = hitungOngkir(qtyNum);
+  const ongkirNum = ongkirOverride !== null ? parseFloat(ongkirOverride) || 0 : ongkirStandar;
   const perPcs = qtyNum > 0 ? totalNum / qtyNum : 0;
   const modal = qtyNum * hppNum;
-  const BIAYA_PACKING = 2000;
-  const profit =
-    (channel === "online" ? totalNum - modal - ongkirNum : totalNum - modal) - BIAYA_PACKING;
+  const profit = hitungProfitPreview({
+    channel,
+    totalHarga: totalNum,
+    qty: qtyNum,
+    hpp: hppNum,
+    ongkir: ongkirNum,
+  });
 
   function onProductPick(id: string) {
     setProdukId(id);
@@ -284,15 +294,30 @@ export default function TambahTransaksiForm({ products }: { products: Product[] 
       </Field>
 
       {channel === "online" ? (
-        <Field label="Ongkir">
+        <Field label="Ongkir (tarif SiCepat)">
           <input
             type="number"
             min={0}
-            value={ongkir}
-            onChange={(e) => setOngkir(e.target.value)}
-            placeholder="0"
+            value={ongkirOverride ?? String(ongkirStandar)}
+            onChange={(e) => setOngkirOverride(e.target.value)}
             className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
           />
+          <div className="mt-1 text-xs text-ink-faint">
+            {ongkirOverride === null ? (
+              <>Otomatis sesuai jumlah bibit ({qtyNum || 0} bibit = {fmtIDR(ongkirStandar)})</>
+            ) : (
+              <>
+                Diubah manual ·{" "}
+                <button
+                  type="button"
+                  onClick={() => setOngkirOverride(null)}
+                  className="font-semibold text-primary"
+                >
+                  pakai tarif standar {fmtIDR(ongkirStandar)}
+                </button>
+              </>
+            )}
+          </div>
         </Field>
       ) : (
         <Field label="Status Pembayaran">

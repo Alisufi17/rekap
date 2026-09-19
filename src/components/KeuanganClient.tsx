@@ -6,6 +6,8 @@ import {
   addOperatingExpense,
   deleteOperatingExpense,
   copyRecurringExpenses,
+  addPencairanDana,
+  deletePencairanDana,
 } from "@/lib/finance";
 import { fmtIDR, fmtDate, localDateStr, todayStr } from "@/lib/format";
 import type {
@@ -14,6 +16,7 @@ import type {
   OperatingExpense,
   MonthlyTarget,
   VMonthlyPnl,
+  PencairanDana,
 } from "@/types/database";
 
 function firstOfMonth(d = new Date()) {
@@ -26,11 +29,13 @@ export default function KeuanganClient({
   expenses,
   target,
   pnl,
+  pencairanDana,
 }: {
   categories: ExpenseCategory[];
   expenses: OperatingExpense[];
   target: MonthlyTarget | null;
   pnl: VMonthlyPnl | null;
+  pencairanDana: PencairanDana[];
 }) {
   const bulanIni = firstOfMonth();
 
@@ -38,7 +43,231 @@ export default function KeuanganClient({
     <div className="space-y-5">
       <RingkasanBulan pnl={pnl} />
       <TargetForm bulan={bulanIni} target={target} />
+      <PencairanDanaSection dana={pencairanDana} />
+      <TopUpIklanForm />
       <BiayaOperasional bulan={bulanIni} categories={categories} expenses={expenses} />
+    </div>
+  );
+}
+
+function PencairanDanaSection({ dana }: { dana: PencairanDana[] }) {
+  const [tanggal, setTanggal] = useState(todayStr());
+  const [sumber, setSumber] = useState("Mengantar");
+  const [nominal, setNominal] = useState("");
+  const [catatan, setCatatan] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const totalBulanIni = dana.reduce((s, d) => s + d.nominal, 0);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    const res = await addPencairanDana({
+      tanggal,
+      sumber,
+      nominal: parseFloat(nominal) || 0,
+      catatan,
+    });
+    setSaving(false);
+    if (!res.ok) {
+      setError(res.error || "Gagal menyimpan");
+      return;
+    }
+    setNominal("");
+    setCatatan("");
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Hapus catatan pencairan ini?")) return;
+    await deletePencairanDana(id);
+  }
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-sm font-bold">Pencairan Dana</div>
+        <div className="text-xs text-ink-soft">
+          Bulan ini <b className="num text-ink">{fmtIDR(totalBulanIni)}</b>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="mb-4 space-y-3 rounded-xl border border-border bg-white p-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-soft">Tanggal</label>
+            <input
+              type="date"
+              value={tanggal}
+              max={todayStr()}
+              onChange={(e) => setTanggal(e.target.value)}
+              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-soft">Sumber</label>
+            <input
+              type="text"
+              value={sumber}
+              onChange={(e) => setSumber(e.target.value)}
+              placeholder="Mengantar"
+              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-soft">Nominal Cair</label>
+          <input
+            type="number"
+            min={0}
+            value={nominal}
+            onChange={(e) => setNominal(e.target.value)}
+            placeholder="0"
+            className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+          />
+        </div>
+        <input
+          type="text"
+          value={catatan}
+          onChange={(e) => setCatatan(e.target.value)}
+          placeholder="Catatan (opsional)"
+          className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+        />
+        {error && <div className="text-sm text-accent">{error}</div>}
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {saving ? "Menyimpan..." : "Catat Pencairan"}
+        </button>
+      </form>
+
+      {dana.length === 0 ? (
+        <div className="py-4 text-center text-sm text-ink-faint">
+          Belum ada pencairan dana bulan ini.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {dana.map((d) => (
+            <div
+              key={d.id}
+              className="flex items-center justify-between rounded-xl border border-border bg-white p-3"
+            >
+              <div>
+                <div className="text-sm font-medium">{d.sumber}</div>
+                <div className="text-xs text-ink-faint">
+                  {fmtDate(d.tanggal)}
+                  {d.catatan ? ` · ${d.catatan}` : ""}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="num text-sm font-semibold text-primary">{fmtIDR(d.nominal)}</div>
+                <button onClick={() => handleDelete(d.id)} className="text-xs text-accent">
+                  Hapus
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TopUpIklanForm() {
+  const [tanggal, setTanggal] = useState(todayStr());
+  const [transfer, setTransfer] = useState("");
+  const [saldoMasuk, setSaldoMasuk] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+
+  const transferNum = parseFloat(transfer) || 0;
+  const saldoNum = parseFloat(saldoMasuk) || 0;
+  const fee = Math.max(0, transferNum - saldoNum);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (fee <= 0) {
+      setError("Isi Transfer dan Saldo Masuk dulu — fee dihitung dari selisihnya");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    setSavedMsg("");
+    const res = await addOperatingExpense({
+      tanggal,
+      kategori: "topup_iklan",
+      nominal: fee,
+      catatan: `Transfer ${fmtIDR(transferNum)} → saldo masuk ${fmtIDR(saldoNum)}`,
+      berulang: false,
+    });
+    setSaving(false);
+    if (!res.ok) {
+      setError(res.error || "Gagal menyimpan");
+      return;
+    }
+    setTransfer("");
+    setSaldoMasuk("");
+    setSavedMsg(`Fee ${fmtIDR(fee)} dicatat sebagai Biaya Operasional`);
+  }
+
+  return (
+    <div>
+      <div className="mb-2 text-sm font-bold">Catat Top Up Iklan</div>
+      <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-border bg-white p-4">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-soft">Tanggal</label>
+          <input
+            type="date"
+            value={tanggal}
+            max={todayStr()}
+            onChange={(e) => setTanggal(e.target.value)}
+            className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-soft">
+              Transfer (uang keluar)
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={transfer}
+              onChange={(e) => setTransfer(e.target.value)}
+              placeholder="505000"
+              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-soft">Saldo Masuk</label>
+            <input
+              type="number"
+              min={0}
+              value={saldoMasuk}
+              onChange={(e) => setSaldoMasuk(e.target.value)}
+              placeholder="475000"
+              className="w-full rounded-lg border border-border px-3 py-2.5 text-sm"
+            />
+          </div>
+        </div>
+        <div className="flex items-center justify-between rounded-lg bg-surface px-3 py-2.5 text-sm">
+          <span className="text-ink-soft">Fee (otomatis)</span>
+          <span className="num font-bold text-accent">{fmtIDR(fee)}</span>
+        </div>
+        {error && <div className="text-sm text-accent">{error}</div>}
+        {savedMsg && <div className="text-xs text-ink-soft">{savedMsg}</div>}
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {saving ? "Menyimpan..." : "Catat Fee Top Up"}
+        </button>
+      </form>
     </div>
   );
 }
