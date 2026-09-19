@@ -34,7 +34,7 @@ function makeDeps(overrides: Partial<WaOrderDeps> = {}) {
 }
 
 describe("pushWaOrder", () => {
-  it("inserts one row per item, HPP from the product lookup, shipping only on the first row", async () => {
+  it("inserts one row per item, HPP from the product lookup, the shop-paid shipping only on the first row", async () => {
     const { deps, inserted } = makeDeps();
 
     await pushWaOrder(
@@ -47,7 +47,7 @@ describe("pushWaOrder", () => {
           { produkNama: "Kiojay Harga Normal", qty: 1, harga: 99000 },
           { produkNama: "Kiojay Harga Normal", qty: 2, harga: 79500 },
         ],
-        ongkir: 20000,
+        ongkir: 0,
       },
       deps,
     );
@@ -59,13 +59,54 @@ describe("pushWaOrder", () => {
       harga: 99000,
       hpp: 18000,
       produk_id: "prod-1",
-      ongkir: 20000,
+      ongkir: 30000, // SiCepat tariff for 3 seedlings in total
       status: "proses",
       affects_stock: true,
       dikemas: false,
       catatan: "Order WA (otomatis) - order order-1",
     });
     expect(inserted[1]).toMatchObject({ qty: 2, harga: 79500, ongkir: 0 });
+  });
+
+  // Owner confirmed 2026-09-19 ("ya di tanggung aku"): the shop pays the
+  // courier, so the ongkir that lands in profit is the SiCepat tariff for the
+  // order's total seedlings - not the (usually 0) amount the customer paid.
+  describe("shop-paid ongkir (SiCepat tariff)", () => {
+    async function ongkirFor(qtys: number[], customerPaid = 0) {
+      const { deps, inserted } = makeDeps();
+      await pushWaOrder(
+        {
+          orderId: "order-x",
+          tanggal: "2026-09-19",
+          customer: "Budi",
+          customerPhone: null,
+          items: qtys.map((qty) => ({ produkNama: "Kiojay Harga Normal", qty, harga: 99000 })),
+          ongkir: customerPaid,
+        },
+        deps,
+      );
+      return inserted.map((r) => r.ongkir);
+    }
+
+    it("uses the owner's tariff by total seedlings: 1 = 12.000, 2 = 24.000, 3 = 30.000", async () => {
+      expect(await ongkirFor([1])).toEqual([12000]);
+      expect(await ongkirFor([2])).toEqual([24000]);
+      expect(await ongkirFor([3])).toEqual([30000]);
+    });
+
+    it("counts seedlings across every line item, and charges it once on the first row", async () => {
+      expect(await ongkirFor([1, 1])).toEqual([24000, 0]); // 2 seedlings in total
+    });
+
+    it("continues past 3 with the tariff already in pricing.ts", async () => {
+      expect(await ongkirFor([5])).toEqual([50000]);
+    });
+
+    it("lets what the customer paid for shipping offset the cost, never going below 0", async () => {
+      expect(await ongkirFor([1], 5000)).toEqual([7000]);
+      expect(await ongkirFor([1], 12000)).toEqual([0]);
+      expect(await ongkirFor([1], 30000)).toEqual([0]);
+    });
   });
 
   it("throws ProductNotFoundError and inserts nothing when the product doesn't exist", async () => {

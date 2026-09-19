@@ -1,4 +1,5 @@
 import type { Transaction, VTransaction } from "@/types/database";
+import { hitungOngkir } from "@/lib/pricing";
 
 // Owner request 2026-09-15: wa-ai-cs (the owner's separate WhatsApp AI
 // customer-service system, own repo) used to write straight into this app's
@@ -61,6 +62,9 @@ export interface PushWaOrderInput {
   customer: string;
   customerPhone: string | null;
   items: { produkNama: string; qty: number; harga: number }[];
+  // What the CUSTOMER was charged for shipping on top of the item prices
+  // (usually 0 - the prices already include it). NOT the cost this shop pays
+  // the courier; that comes from the SiCepat tariff below.
   ongkir: number;
 }
 
@@ -79,6 +83,16 @@ export async function pushWaOrder(input: PushWaOrderInput, deps: WaOrderDeps): P
     products.set(nama, product);
   }
 
+  // Owner confirmed 2026-09-19 ("ya di tanggung aku"): the shop pays the
+  // courier, so this transaction's ongkir - which v_transactions subtracts
+  // from profit - is the standard SiCepat tariff for the order's total number
+  // of seedlings, exactly what this app's own "Tambah Transaksi" form fills in
+  // (see src/lib/pricing.ts). Before this it was the customer-charged amount,
+  // 0 on almost every order, so profit read Rp12.000+ too high. Whatever the
+  // customer paid towards shipping offsets it (never below 0).
+  const totalQty = input.items.reduce((sum, item) => sum + item.qty, 0);
+  const ongkirBiaya = Math.max(0, hitungOngkir(totalQty) - input.ongkir);
+
   const rows: TransactionInsertRow[] = input.items.map((item, index) => {
     const product = products.get(item.produkNama)!;
     return {
@@ -93,7 +107,7 @@ export async function pushWaOrder(input: PushWaOrderInput, deps: WaOrderDeps): P
       hpp: product.hpp,
       // Shipping belongs to the order, not any one line item - only the
       // first row carries it, so it isn't double-counted across items.
-      ongkir: index === 0 ? input.ongkir : 0,
+      ongkir: index === 0 ? ongkirBiaya : 0,
       admin: 0,
       catatan: `Order WA (otomatis) - order ${input.orderId}`,
       status: "proses",

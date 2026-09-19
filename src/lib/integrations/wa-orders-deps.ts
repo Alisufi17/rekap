@@ -1,5 +1,36 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import type { WaDailyChatsDeps } from "./wa-daily-chats";
 import type { WaOrderDeps, WaOrderFinancialsDeps } from "./wa-orders";
+
+export function createRealWaDailyChatsDeps(): WaDailyChatsDeps {
+  const supabase = createServiceClient();
+  return {
+    async updateChatMasuk(tanggal, chatMasuk) {
+      // Only chat_masuk in the payload: spend_iklan on the same row is the
+      // owner's own input and must never be touched by a sync.
+      const { data, error } = await supabase
+        .from("daily_metrics")
+        .update({ chat_masuk: chatMasuk })
+        .eq("tanggal", tanggal)
+        .select("tanggal");
+      if (error) {
+        throw new Error(`Chat count update failed: ${error.message}`);
+      }
+      return (data?.length ?? 0) > 0;
+    },
+    async insertChatMasuk(tanggal, chatMasuk) {
+      const { error } = await supabase
+        .from("daily_metrics")
+        .insert({ tanggal, spend_iklan: 0, chat_masuk: chatMasuk });
+      if (error) {
+        // 23505 = unique violation: that date's row was created a moment ago.
+        if (error.code === "23505") return "conflict";
+        throw new Error(`Chat count insert failed: ${error.message}`);
+      }
+      return "inserted";
+    },
+  };
+}
 
 export function createRealWaOrderFinancialsDeps(): WaOrderFinancialsDeps {
   const supabase = createServiceClient();
