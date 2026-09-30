@@ -179,7 +179,7 @@ export default function AppShell({
         </header>
 
         <main className="px-4 py-4 pb-24 lg:px-8 lg:py-6 lg:pb-10">
-          <div className={width}>
+          <div className={`lg:mx-auto ${width}`}>
             {title && (
               <h1 className="mb-5 hidden text-2xl font-extrabold text-ink lg:block">{title}</h1>
             )}

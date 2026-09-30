@@ -295,6 +295,16 @@ function RingkasanBulan({ pnl }: { pnl: VMonthlyPnl | null }) {
         )}
       </div>
 
+      <div className="mt-3 flex items-center justify-between rounded-lg bg-primary/10 p-3">
+        <div>
+          <div className="text-sm font-bold text-primary">Sedekah (5% Profit Bersih)</div>
+          <div className="text-xs text-ink-soft">Disisihkan otomatis dari profit bersih bulan ini</div>
+        </div>
+        <div className="num text-base font-extrabold text-primary">
+          {fmtIDR(Math.max(0, pnl.profit_bersih) * 0.05)}
+        </div>
+      </div>
+
       <div className="mt-3 rounded-lg bg-surface p-3 text-xs">
         <div className="mb-1.5 font-semibold text-ink-soft">Rincian Biaya Packing</div>
         <Row label="Bahan (kardus, lakban, dll)" value={fmtIDR(pnl.biaya_packing_bahan)} />
