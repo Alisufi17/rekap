@@ -44,7 +44,7 @@ export default function DashboardClient({
   initialTo?: string;
 }) {
   const hasInitialRange = Boolean(initialFrom);
-  const [preset, setPreset] = useState<PresetKey>(hasInitialRange ? "custom" : "7_hari");
+  const [preset, setPreset] = useState<PresetKey>(hasInitialRange ? "custom" : "bulan_ini");
   const [customRange, setCustomRange] = useState<DateRange>(
     hasInitialRange
       ? { from: initialFrom!, to: initialTo || initialFrom! }
